@@ -237,6 +237,18 @@ def page_diagnostico_sge():
         )
         st.plotly_chart(fig_radar, use_container_width=True, config={"displayModeBar": False})
 
+    # ── Expander: descrição dos itens ───────────────────────────────────────
+    with st.expander("📖 Ver descrição e regras de cálculo dos itens SGE", expanded=False):
+        desc_rows = []
+        for assunto in assuntos_disp:
+            regra = next((v for k, v in REGRAS_CALCULO.items()
+                          if k.upper() in assunto.upper() or assunto.upper() in k.upper()),
+                         "Pontuação por evidência apresentada")
+            desc_rows.append({"Item SGE": assunto, "Regra de Cálculo": regra})
+        df_desc = pd.DataFrame(desc_rows)
+        st.dataframe(df_desc, use_container_width=True, hide_index=True,
+                     height=min(480, len(df_desc) * 38 + 50))
+
     # Tabela memória de cálculo
     st.markdown('<div class="sge-header">📋 Memória de Cálculo — Item × Setor</div>', unsafe_allow_html=True)
     st.caption("Pontos obtidos / Pontos máximos (% atingida) por setor")
@@ -269,7 +281,7 @@ def page_diagnostico_sge():
 
     cols_show = ["Item","Regra"] + setores_calc + ["TOTAL"]
     st.dataframe(
-        df_tabela[cols_show].style.applymap(_highlight, subset=setores_calc + ["TOTAL"]),
+        df_tabela[cols_show].style.map(_highlight, subset=setores_calc + ["TOTAL"]),
         use_container_width=True, hide_index=True,
         height=min(600, len(df_tabela) * 42 + 60),
     )
