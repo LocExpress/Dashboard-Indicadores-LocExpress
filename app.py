@@ -14,6 +14,7 @@ from plotly.subplots import make_subplots
 
 import utils
 from sge_page import page_diagnostico_sge
+from orcamento_page import page_orcamento
 
 # ─── Configuração da Página ───────────────────────────────────────────────────
 
