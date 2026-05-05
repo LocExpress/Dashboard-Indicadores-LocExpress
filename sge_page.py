@@ -442,4 +442,3 @@ def page_diagnostico_sge():
         height=380,
     )
     st.plotly_chart(fig_item, use_container_width=True, config={"displayModeBar": False})
-
