@@ -67,7 +67,6 @@ def load_sge_data():
     try:
         r = requests.get(SGE_GERAL_URL, timeout=15)
         r.raise_for_status()
-        # Força UTF-8 para preservar acentos corretamente
         r.encoding = "utf-8"
         df = pd.read_csv(io.StringIO(r.text))
         df.columns = [c.strip() for c in df.columns]
@@ -82,16 +81,24 @@ def _parse_sge(df_raw):
         return pd.DataFrame()
     df = df_raw.copy()
     df.columns = [c.strip().upper() for c in df.columns]
+
     col_map = {}
     for c in df.columns:
-        if "DATA" in c:   col_map[c] = "DATA"
-        elif "SETOR" in c:  col_map[c] = "SETOR"
-        elif "ASSUNTO" in c: col_map[c] = "ASSUNTO"
-        elif "AVALI" in c:  col_map[c] = "AVALIACAO"
+        cn = _norm(c)
+        if "DATA" in cn:          col_map[c] = "DATA"
+        elif "SETOR" in cn:       col_map[c] = "SETOR"
+        elif "ASSUNTO" in cn:     col_map[c] = "ASSUNTO"
+        elif "AVALI" in cn:       col_map[c] = "AVALIACAO"
+        elif cn in ("MAXIMO", "MAX", "PONTOS MAX", "PONTOS_MAX",
+                    "MAXIMOS", "MÁXIMO", "MAXI", "PESO", "TOTAL MAX"):
+            col_map[c] = "MAXIMO"
+
     df.rename(columns=col_map, inplace=True)
-    for needed in ("DATA","SETOR","ASSUNTO","AVALIACAO"):
+
+    for needed in ("DATA", "SETOR", "ASSUNTO", "AVALIACAO"):
         if needed not in df.columns:
             return pd.DataFrame()
+
     df["DATA"] = pd.to_datetime(df["DATA"], dayfirst=True, errors="coerce")
     df = df.dropna(subset=["DATA"])
     df["MES"] = df["DATA"].dt.month
@@ -99,32 +106,68 @@ def _parse_sge(df_raw):
 
     def _parse_score(v):
         s = str(v).strip()
-        if s in ("-","","nan","None","N/A"): return float("nan")
+        if s in ("-", "", "nan", "None", "N/A"): return float("nan")
         try: return float(s)
         except: return float("nan")
 
     df["PONTOS"]   = df["AVALIACAO"].apply(_parse_score)
     df["AVALIADO"] = ~df["PONTOS"].isna()
+
+    # ── Coluna MAXIMO ────────────────────────────────────────────────────────
+    # Prioridade:
+    #   1. Coluna explícita "MAXIMO" (ou variante) já na planilha
+    #   2. Fallback: 5 pontos por linha (comportamento anterior)
+    if "MAXIMO" in df.columns:
+        df["MAXIMO"] = df["MAXIMO"].apply(_parse_score).fillna(5.0)
+    else:
+        # Sem coluna explícita → usa 5 como padrão por item
+        df["MAXIMO"] = 5.0
+
     return df
 
+
+# ── Cálculo de % usando pontos máximos reais ─────────────────────────────────
+
 def _calc_pct_item_setor(df, assunto, setor, mes=None, ano=None):
-    mask = (df["ASSUNTO"].str.strip().apply(_norm) == _norm(assunto)) & \
-           (df["SETOR"].str.strip().apply(_norm) == _norm(setor))
+    """
+    Retorna (pts_obtidos, pts_maximos, pct) para um item+setor.
+    pts_maximos = soma da coluna MAXIMO (não mais n_linhas × 5).
+    """
+    mask = (
+        df["ASSUNTO"].str.strip().apply(_norm) == _norm(assunto)
+    ) & (
+        df["SETOR"].str.strip().apply(_norm) == _norm(setor)
+    )
     if mes: mask &= (df["MES"] == mes)
     if ano: mask &= (df["ANO"] == ano)
+
     avaliados = df[mask & df["AVALIADO"]]
-    if avaliados.empty: return float("nan"), float("nan"), float("nan")
+    if avaliados.empty:
+        return float("nan"), float("nan"), float("nan")
+
     pts  = avaliados["PONTOS"].sum()
-    maxi = len(avaliados) * 5
-    return pts, maxi, (pts/maxi*100) if maxi > 0 else float("nan")
+    maxi = avaliados["MAXIMO"].sum()          # ← usa máximo real, não n*5
+    pct  = (pts / maxi * 100) if maxi > 0 else float("nan")
+    return pts, maxi, pct
+
 
 def _calc_pct_setor(df, setor, mes=None, ano=None):
+    """
+    % geral do setor = soma(PONTOS) / soma(MAXIMO) × 100
+    Ex.: IMP. obteve 48 de 65 → 73,84% ≈ 74%
+    """
     mask = df["SETOR"].str.strip().apply(_norm) == _norm(setor)
     if mes: mask &= (df["MES"] == mes)
     if ano: mask &= (df["ANO"] == ano)
+
     sub = df[mask & df["AVALIADO"]]
-    if sub.empty: return float("nan")
-    return sub["PONTOS"].sum() / (len(sub) * 5) * 100
+    if sub.empty:
+        return float("nan")
+
+    pts  = sub["PONTOS"].sum()
+    maxi = sub["MAXIMO"].sum()               # ← usa máximo real
+    return (pts / maxi * 100) if maxi > 0 else float("nan")
+
 
 def page_diagnostico_sge():
     st.markdown("""
@@ -164,19 +207,19 @@ def page_diagnostico_sge():
         st.warning("⚠️ Nenhum dado SGE encontrado.")
         return
 
-    anos_disp    = sorted(df["ANO"].dropna().unique().tolist(), reverse=True)
-    setores_disp = sorted(df["SETOR"].dropna().unique().tolist())
+    anos_disp     = sorted(df["ANO"].dropna().unique().tolist(), reverse=True)
+    setores_disp  = sorted(df["SETOR"].dropna().unique().tolist())
     assuntos_disp = sorted(df["ASSUNTO"].dropna().unique().tolist())
 
     fc1, fc2, fc3 = st.columns(3)
     with fc1:
         ano_sel = st.selectbox("📅 Ano", anos_disp, key="sge_ano")
     with fc2:
-        mes_sel = st.selectbox("📆 Mês", [0]+list(range(1,13)),
-                               format_func=lambda m: "Todos" if m==0 else MESES[m-1],
+        mes_sel = st.selectbox("📆 Mês", [0] + list(range(1, 13)),
+                               format_func=lambda m: "Todos" if m == 0 else MESES[m - 1],
                                key="sge_mes")
     with fc3:
-        setor_view = st.selectbox("🏢 Setor", ["Todos"]+setores_disp, key="sge_setor_view")
+        setor_view = st.selectbox("🏢 Setor", ["Todos"] + setores_disp, key="sge_setor_view")
 
     mes_f = None if mes_sel == 0 else mes_sel
     df_f  = df[df["ANO"] == ano_sel].copy()
@@ -186,26 +229,40 @@ def page_diagnostico_sge():
     setores_calc = setores_disp if setor_view == "Todos" else [setor_view]
     pcts_setores = {s: _calc_pct_setor(df_f, s) for s in setores_calc}
     vals_validos = [v for v in pcts_setores.values() if not pd.isna(v)]
-    media_geral  = sum(vals_validos)/len(vals_validos) if vals_validos else float("nan")
+    media_geral  = sum(vals_validos) / len(vals_validos) if vals_validos else float("nan")
 
+    # ── Cards por setor ───────────────────────────────────────────────────────
     st.markdown('<div class="sge-header">📊 Resumo Geral do Diagnóstico</div>', unsafe_allow_html=True)
 
+    # Mostra também pts obtidos / pts máximos no card
     cols_cards = st.columns(min(len(setores_calc), 4))
     for i, setor in enumerate(setores_calc):
         pct   = pcts_setores[setor]
         color = _status_color(pct)
         icon  = _status_icon(pct)
         pct_str = f"{pct:.0f}%" if not pd.isna(pct) else "—"
+
+        # Pontos brutos para exibir no sub-label do card
+        sub = df_f[df_f["SETOR"].str.strip().apply(_norm) == _norm(setor)]
+        sub_av = sub[sub["AVALIADO"]]
+        if not sub_av.empty:
+            pts_tot  = sub_av["PONTOS"].sum()
+            maxi_tot = sub_av["MAXIMO"].sum()
+            pts_label = f"{pts_tot:.0f} / {maxi_tot:.0f} pts"
+        else:
+            pts_label = ""
+
         with cols_cards[i % 4]:
             st.markdown(f"""
             <div class="sge-card" style="border-left:5px solid {color};text-align:center">
                 <div style="font-size:0.65rem;font-weight:700;color:#6B7280;
                             text-transform:uppercase;letter-spacing:0.06em">{setor}</div>
                 <div style="font-size:2rem;font-weight:900;color:{color};line-height:1.1">{pct_str}</div>
-                <div style="font-size:0.75rem;color:{color}">{icon} SGE</div>
+                <div style="font-size:0.72rem;color:{color};margin-top:2px">{icon} SGE</div>
+                <div style="font-size:0.68rem;color:#9CA3AF;margin-top:2px">{pts_label}</div>
             </div>""", unsafe_allow_html=True)
 
-    mes_label = MESES[mes_f-1] if mes_f else "Todos os meses"
+    mes_label = MESES[mes_f - 1] if mes_f else "Todos os meses"
     media_str = f"{media_geral:.0f}%" if not pd.isna(media_geral) else "—"
     st.markdown(f"""
     <div style="background:linear-gradient(135deg,#2D3192,#1A1A6E);border-radius:12px;
@@ -218,7 +275,7 @@ def page_diagnostico_sge():
         </div>
     </div>""", unsafe_allow_html=True)
 
-    # Radar
+    # ── Radar ─────────────────────────────────────────────────────────────────
     st.markdown('<div class="sge-header">🕸️ Radar de Desempenho por Setor</div>', unsafe_allow_html=True)
     radar_vals   = [pcts_setores.get(s, 0) or 0 for s in setores_calc]
     radar_labels = [SETORES_FULL.get(s, s) for s in setores_calc]
@@ -234,7 +291,7 @@ def page_diagnostico_sge():
         ))
         fig_radar.update_layout(
             polar=dict(
-                radialaxis=dict(visible=True, range=[0,100], ticksuffix="%",
+                radialaxis=dict(visible=True, range=[0, 100], ticksuffix="%",
                                 gridcolor="#E5E7EB", linecolor="#E5E7EB"),
                 angularaxis=dict(gridcolor="#E5E7EB"),
                 bgcolor="rgba(0,0,0,0)",
@@ -245,35 +302,45 @@ def page_diagnostico_sge():
         )
         st.plotly_chart(fig_radar, use_container_width=True, config={"displayModeBar": False})
 
-    # ── Expander: descrição dos itens ───────────────────────────────────────
+    # ── Regras de cálculo ─────────────────────────────────────────────────────
     with st.expander("📖 Ver descrição e regras de cálculo dos itens SGE", expanded=False):
         desc_rows = []
         for assunto in assuntos_disp:
-            regra = next((v for k, v in REGRAS_CALCULO.items()
-                          if _norm(k) in _norm(assunto) or _norm(assunto) in _norm(k)),
-                         "Pontuação por evidência apresentada")
+            regra = next(
+                (v for k, v in REGRAS_CALCULO.items()
+                 if _norm(k) in _norm(assunto) or _norm(assunto) in _norm(k)),
+                "Pontuação por evidência apresentada"
+            )
             desc_rows.append({"Item SGE": assunto, "Regra de Cálculo": regra})
         df_desc = pd.DataFrame(desc_rows)
         st.dataframe(df_desc, use_container_width=True, hide_index=True,
                      height=min(480, len(df_desc) * 38 + 50))
 
-    # Tabela memória de cálculo
+    # ── Tabela memória de cálculo ─────────────────────────────────────────────
     st.markdown('<div class="sge-header">📋 Memória de Cálculo — Item × Setor</div>', unsafe_allow_html=True)
-    st.caption("Pontos obtidos / Pontos máximos (% atingida) por setor")
+    st.caption("Pontos obtidos / Pontos máximos reais (% atingida) por setor")
 
     rows_data = []
     for assunto in assuntos_disp:
-        regra = next((v for k, v in REGRAS_CALCULO.items() if k.upper() in assunto.upper()), "Por evidência")
+        regra = next(
+            (v for k, v in REGRAS_CALCULO.items() if k.upper() in assunto.upper()),
+            "Por evidência"
+        )
         row = {"Item": assunto, "Regra": regra}
-        total_pts = 0; total_max = 0
+        total_pts = 0
+        total_max = 0
         for setor in setores_calc:
             pts, maxi, pct = _calc_pct_item_setor(df_f, assunto, setor)
             if pd.isna(pts):
                 row[setor] = "—"
             else:
                 row[setor] = f"{int(pts)}/{int(maxi)} ({pct:.0f}%)"
-                total_pts += int(pts); total_max += int(maxi)
-        row["TOTAL"] = f"{total_pts}/{total_max} ({total_pts/total_max*100:.0f}%)" if total_max > 0 else "—"
+                total_pts += int(pts)
+                total_max += int(maxi)
+        row["TOTAL"] = (
+            f"{total_pts}/{total_max} ({total_pts/total_max*100:.0f}%)"
+            if total_max > 0 else "—"
+        )
         rows_data.append(row)
 
     df_tabela = pd.DataFrame(rows_data)
@@ -285,19 +352,20 @@ def page_diagnostico_sge():
             if pct >= 80: return "background-color:#ECFDF5;color:#065F46;font-weight:700"
             if pct >= 60: return "background-color:#FFFBEB;color:#92400E;font-weight:700"
             return "background-color:#FEF2F2;color:#991B1B;font-weight:700"
-        except: return ""
+        except:
+            return ""
 
-    cols_show = ["Item","Regra"] + setores_calc + ["TOTAL"]
+    cols_show = ["Item", "Regra"] + setores_calc + ["TOTAL"]
     st.dataframe(
         df_tabela[cols_show].style.map(_highlight, subset=setores_calc + ["TOTAL"]),
         use_container_width=True, hide_index=True,
         height=min(600, len(df_tabela) * 42 + 60),
     )
 
-    # Evolução mensal
+    # ── Evolução mensal ───────────────────────────────────────────────────────
     st.markdown('<div class="sge-header">📈 Evolução Mensal — % SGE por Setor</div>', unsafe_allow_html=True)
-    cores = [C_BLUE, C_ORANGE, "#10B981", "#8B5CF6", "#F59E0B", "#EF4444", "#6366F1"]
-    df_ano = df[df["ANO"] == ano_sel]
+    cores   = [C_BLUE, C_ORANGE, "#10B981", "#8B5CF6", "#F59E0B", "#EF4444", "#6366F1"]
+    df_ano  = df[df["ANO"] == ano_sel]
     fig_evo = go.Figure()
     for i, setor in enumerate(setores_calc):
         ys = []
@@ -324,10 +392,13 @@ def page_diagnostico_sge():
     )
     st.plotly_chart(fig_evo, use_container_width=True, config={"displayModeBar": False})
 
-    # Drill-down por item
+    # ── Drill-down por item ───────────────────────────────────────────────────
     st.markdown('<div class="sge-header">🔎 Detalhe de Item por Mês</div>', unsafe_allow_html=True)
-    item_sel = st.selectbox("Selecione o Item", assuntos_disp, key="sge_item_detail")
-    regra_sel = next((v for k, v in REGRAS_CALCULO.items() if k.upper() in item_sel.upper()), "Por evidência")
+    item_sel  = st.selectbox("Selecione o Item", assuntos_disp, key="sge_item_detail")
+    regra_sel = next(
+        (v for k, v in REGRAS_CALCULO.items() if k.upper() in item_sel.upper()),
+        "Por evidência"
+    )
     st.markdown(f'<div class="sge-regra">📏 Regra: {regra_sel}</div>', unsafe_allow_html=True)
 
     fig_item = go.Figure()
