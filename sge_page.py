@@ -1,9 +1,5 @@
 """
 sge_page.py — Aba Diagnóstico SGE para o Dashboard LocExpress
-Lê dados da aba BasePreencher do Google Sheets e exibe:
-  - Memória de cálculo de cada item por setor
-  - % atingida por setor e por item
-  - Evolução mensal
 """
 
 import streamlit as st
@@ -12,30 +8,20 @@ import plotly.graph_objects as go
 import requests
 import io
 
-# URL de exportação direta via publish-to-web (requer aba publicada)
-# Formato: export?format=csv&gid=GID_DA_ABA
-# BaseGeral: use a URL publicada como CSV pela função Arquivo > Publicar na web
-# Fallback: tenta múltiplos formatos de URL
-
-SPREADSHEET_ID = "1jV6pWW3XoXNu4-xYVeDvsYQumWN1fNPn"
-
-# URLs publicadas via "Arquivo > Publicar na web" — apenas essas abas ficam públicas
+# URLs publicadas via "Arquivo > Publicar na web"
 SGE_GERAL_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vR7vqbGSRITRkAikpISxGrIyAXSVr2HZllFSiYhIBIcye5_PsrTcGVAs1THfIyhqw/pub?gid=225370926&single=true&output=csv"
 SGE_SHEET_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vR7vqbGSRITRkAikpISxGrIyAXSVr2HZllFSiYhIBIcye5_PsrTcGVAs1THfIyhqw/pub?gid=1667231213&single=true&output=csv"
 
-# Cores LocExpress
-C_BLUE    = "#2D3192"
-C_ORANGE  = "#F47920"
-C_GREEN   = "#00C853"
-C_YELLOW  = "#FFB300"
-C_RED     = "#F44336"
-C_GRAY    = "#6B7280"
-C_LIGHT   = "#F3F4F6"
+C_BLUE   = "#2D3192"
+C_ORANGE = "#F47920"
+C_GREEN  = "#00C853"
+C_YELLOW = "#FFB300"
+C_RED    = "#F44336"
+C_GRAY   = "#6B7280"
 
-SETORES = ["IMP.", "PER.", "COM.", "MKT.", "DP/RH", "FIN.", "ADM."]
 SETORES_FULL = {
     "IMP.": "Implantação", "PER.": "Performance", "COM.": "Comercial",
-    "MKT.": "Marketing",   "DP/RH": "DP/RH",     "FIN.": "Financeiro",
+    "MKT.": "Marketing",   "DP/RH": "DP/RH",      "FIN.": "Financeiro",
     "ADM.": "Administrativo"
 }
 MESES = ["JANEIRO","FEVEREIRO","MARÇO","ABRIL","MAIO","JUNHO",
@@ -49,14 +35,13 @@ REGRAS_CALCULO = {
     "TRP - TÉCNICA DE RESOLUÇÃO DE PROBLEMAS": "1 TRP = 3 pts; 2+ TRPs = 5 pts",
     "FLUXOGRAMAS": "100% mapeados + atualiz. <90 dias = 5 pts; Parcial = 3 pts",
     "FUNCIONOGRAMAS": "100% preenchidos + atualiz. <90 dias = 5 pts; Parcial = 3 pts",
-    "POP´S": "100% POPs + utilização = 5 pts; Parcial = 3 pts",
-    "REUNIÃO DO BOM DIA": "1–2 registros = 3 pts; 3+ = 5 pts",
+    "POP'S": "100% POPs + utilização = 5 pts; Parcial = 3 pts",
+    "REUNIÃO DO BOM DIA": "1-2 registros = 3 pts; 3+ = 5 pts",
     "AUTODIAGNÓSTICO": "Uma evidência = 5 pts",
-    "BENCHMARKING": "1–2 benchmarkings = 3 pts; 3+ = 5 pts",
-    "PDI - PLANO DE DESENVOLVIMENTO INDIVIDUAL OU MATRIZ DE HABILIDADE": "Ter PDI = 5 pts; Não ter = 0",
-    "PDI - PLANO DE DESENVOLVIMENTO INDIVIDUAL": "Ter PDI = 5 pts; Não ter = 0",
+    "BENCHMARKING": "1-2 benchmarkings = 3 pts; 3+ = 5 pts",
+    "PDI": "Ter PDI = 5 pts; Não ter = 0",
     "PLANO DE DESENVOLVIMENTO DE BACKUP": "Ter plano atualizado = 5 pts",
-    "CUMBUCA": "1–2 registros = 3 pts; 3+ = 5 pts",
+    "CUMBUCA": "1-2 registros = 3 pts; 3+ = 5 pts",
 }
 
 def _status_color(pct):
@@ -73,57 +58,36 @@ def _status_icon(pct):
 
 @st.cache_data(ttl=300, show_spinner=False)
 def load_sge_data():
-    """
-    Carrega a aba BaseGeral tentando múltiplas URLs.
-    """
-    urls = [
-        "https://docs.google.com/spreadsheets/d/1jV6pWW3XoXNu4-xYVeDvsYQumWN1fNPn/export?format=csv&sheet=BaseGeral",
-        "https://docs.google.com/spreadsheets/d/1jV6pWW3XoXNu4-xYVeDvsYQumWN1fNPn/gviz/tq?tqx=out:csv&sheet=BaseGeral",
-    ]
-    last_err = None
-    for url in urls:
-        try:
-            r = requests.get(url, timeout=15)
-            r.raise_for_status()
-            df = pd.read_csv(io.StringIO(r.text))
-            df.columns = [c.strip() for c in df.columns]
-            if df.empty or len(df.columns) < 3:
-                continue
-            return df, None
-        except Exception as exc:
-            last_err = str(exc)
-            continue
-    return None, f"Erro ao acessar planilha. Publique a aba BaseGeral como CSV em Arquivo > Publicar na web. Detalhe: {last_err}"
-
+    try:
+        r = requests.get(SGE_GERAL_URL, timeout=15)
+        r.raise_for_status()
+        df = pd.read_csv(io.StringIO(r.text))
+        df.columns = [c.strip() for c in df.columns]
+        if df.empty or len(df.columns) < 3:
+            return None, "Planilha vazia ou sem colunas suficientes."
+        return df, None
+    except Exception as exc:
+        return None, str(exc)
 
 def _parse_sge(df_raw):
-    """
-    Normaliza a BaseGeral:
-      DATA, SETOR, ASSUNTO, AVALIAÇÃO → pontuação numérica (3 ou 5) ou NaN
-    """
     if df_raw is None or df_raw.empty:
         return pd.DataFrame()
-
     df = df_raw.copy()
     df.columns = [c.strip().upper() for c in df.columns]
-
-    # Mapear colunas
     col_map = {}
     for c in df.columns:
-        if "DATA" in c: col_map[c] = "DATA"
-        elif "SETOR" in c: col_map[c] = "SETOR"
+        if "DATA" in c:   col_map[c] = "DATA"
+        elif "SETOR" in c:  col_map[c] = "SETOR"
         elif "ASSUNTO" in c: col_map[c] = "ASSUNTO"
-        elif "AVALI" in c: col_map[c] = "AVALIACAO"
+        elif "AVALI" in c:  col_map[c] = "AVALIACAO"
     df.rename(columns=col_map, inplace=True)
-
     for needed in ("DATA","SETOR","ASSUNTO","AVALIACAO"):
         if needed not in df.columns:
             return pd.DataFrame()
-
     df["DATA"] = pd.to_datetime(df["DATA"], dayfirst=True, errors="coerce")
     df = df.dropna(subset=["DATA"])
-    df["MES"]  = df["DATA"].dt.month
-    df["ANO"]  = df["DATA"].dt.year
+    df["MES"] = df["DATA"].dt.month
+    df["ANO"] = df["DATA"].dt.year
 
     def _parse_score(v):
         s = str(v).strip()
@@ -131,68 +95,45 @@ def _parse_sge(df_raw):
         try: return float(s)
         except: return float("nan")
 
-    df["PONTOS"]  = df["AVALIACAO"].apply(_parse_score)
-    df["MAX_PTS"] = df["PONTOS"].apply(lambda x: 5 if not pd.isna(x) else float("nan"))
-    # Se pontos é NaN, max também NaN (não avaliado), se avaliado, max = 5
+    df["PONTOS"]   = df["AVALIACAO"].apply(_parse_score)
     df["AVALIADO"] = ~df["PONTOS"].isna()
-
     return df
 
-
 def _calc_pct_item_setor(df, assunto, setor, mes=None, ano=None):
-    """% atingida de um item para um setor, opcionalmente filtrando por mês/ano."""
     mask = (df["ASSUNTO"].str.strip().str.upper() == assunto.strip().upper()) & \
            (df["SETOR"].str.strip().str.upper() == setor.strip().upper())
     if mes: mask &= (df["MES"] == mes)
     if ano: mask &= (df["ANO"] == ano)
-    sub = df[mask]
-    avaliados = sub[sub["AVALIADO"]]
+    avaliados = df[mask & df["AVALIADO"]]
     if avaliados.empty: return float("nan"), float("nan"), float("nan")
     pts  = avaliados["PONTOS"].sum()
-    maxi = avaliados["AVALIADO"].sum() * 5
+    maxi = len(avaliados) * 5
     return pts, maxi, (pts/maxi*100) if maxi > 0 else float("nan")
 
-
 def _calc_pct_setor(df, setor, mes=None, ano=None):
-    """% geral de um setor."""
     mask = df["SETOR"].str.strip().str.upper() == setor.strip().upper()
     if mes: mask &= (df["MES"] == mes)
     if ano: mask &= (df["ANO"] == ano)
     sub = df[mask & df["AVALIADO"]]
     if sub.empty: return float("nan")
-    return sub["PONTOS"].sum() / (sub["AVALIADO"].sum() * 5) * 100
-
+    return sub["PONTOS"].sum() / (len(sub) * 5) * 100
 
 def page_diagnostico_sge():
     st.markdown("""
     <style>
-    .sge-card {
-        background:#fff; border-radius:12px; padding:1rem 1.2rem;
-        box-shadow:0 2px 12px rgba(0,0,0,0.07); margin-bottom:0.5rem;
-    }
-    .sge-header {
-        font-size:0.9rem; font-weight:700; color:#2D3192;
-        border-bottom:2.5px solid #F47920; padding-bottom:0.3rem;
-        margin:1rem 0 0.6rem;
-    }
-    .sge-badge {
-        display:inline-block; padding:0.15rem 0.6rem; border-radius:20px;
-        font-size:0.7rem; font-weight:700; border:1px solid rgba(0,0,0,0.15);
-        margin-right:0.3rem;
-    }
-    .sge-regra {
-        font-size:0.72rem; color:#6B7280; font-style:italic;
+    .sge-card { background:#fff; border-radius:12px; padding:1rem 1.2rem;
+        box-shadow:0 2px 12px rgba(0,0,0,0.07); margin-bottom:0.5rem; }
+    .sge-header { font-size:0.9rem; font-weight:700; color:#2D3192;
+        border-bottom:2.5px solid #F47920; padding-bottom:0.3rem; margin:1rem 0 0.6rem; }
+    .sge-regra { font-size:0.72rem; color:#6B7280; font-style:italic;
         background:#F3F4F6; border-radius:6px; padding:0.25rem 0.6rem;
-        display:inline-block; margin-bottom:0.4rem;
-    }
+        display:inline-block; margin-bottom:0.4rem; }
     </style>
     """, unsafe_allow_html=True)
 
-    # ── Cabeçalho da aba ────────────────────────────────────────────────────
     st.markdown("""
     <div style='background:linear-gradient(135deg,#2D3192 0%,#F47920 100%);
-                border-radius:12px;padding:1.2rem 1.8rem;margin-bottom:1.2rem;
-                color:#fff;'>
+                border-radius:12px;padding:1.2rem 1.8rem;margin-bottom:1.2rem;color:#fff;'>
         <div style='font-size:1.3rem;font-weight:900'>🔍 Diagnóstico SGE</div>
         <div style='font-size:0.85rem;opacity:0.88;margin-top:4px'>
             Sistema de Gestão Estratégica — Memória de Cálculo por Setor e Item
@@ -200,12 +141,11 @@ def page_diagnostico_sge():
     </div>
     """, unsafe_allow_html=True)
 
-    # ── Carregar dados ───────────────────────────────────────────────────────
     with st.spinner("Carregando dados SGE..."):
         df_raw, err = load_sge_data()
 
     if err or df_raw is None:
-        st.error(f"❌ Não foi possível carregar os dados SGE: {err}")
+        st.error(f"❌ Erro ao carregar dados SGE: {err}")
         if st.button("🔄 Tentar Novamente", key="sge_retry"):
             st.cache_data.clear()
             st.rerun()
@@ -213,51 +153,42 @@ def page_diagnostico_sge():
 
     df = _parse_sge(df_raw)
     if df.empty:
-        st.warning("⚠️ Nenhum dado SGE encontrado ou estrutura inesperada.")
+        st.warning("⚠️ Nenhum dado SGE encontrado.")
         return
 
-    anos_disp = sorted(df["ANO"].dropna().unique().tolist(), reverse=True)
+    anos_disp    = sorted(df["ANO"].dropna().unique().tolist(), reverse=True)
     setores_disp = sorted(df["SETOR"].dropna().unique().tolist())
     assuntos_disp = sorted(df["ASSUNTO"].dropna().unique().tolist())
 
-    # ── Filtros ──────────────────────────────────────────────────────────────
     fc1, fc2, fc3 = st.columns(3)
     with fc1:
         ano_sel = st.selectbox("📅 Ano", anos_disp, key="sge_ano")
     with fc2:
-        mes_sel = st.selectbox("📆 Mês (0 = todos)", [0]+list(range(1,13)),
+        mes_sel = st.selectbox("📆 Mês", [0]+list(range(1,13)),
                                format_func=lambda m: "Todos" if m==0 else MESES[m-1],
                                key="sge_mes")
     with fc3:
-        setor_view = st.selectbox("🏢 Visualizar Setor", ["Todos"]+setores_disp, key="sge_setor_view")
+        setor_view = st.selectbox("🏢 Setor", ["Todos"]+setores_disp, key="sge_setor_view")
 
     mes_f = None if mes_sel == 0 else mes_sel
-
-    df_f = df[df["ANO"] == ano_sel].copy()
-    if mes_f: df_f = df_f[df_f["MES"] == mes_f]
-
-    # ── KPIs de Resumo ───────────────────────────────────────────────────────
-    st.markdown('<div class="sge-header">📊 Resumo Geral do Diagnóstico</div>',
-                unsafe_allow_html=True)
+    df_f  = df[df["ANO"] == ano_sel].copy()
+    if mes_f:
+        df_f = df_f[df_f["MES"] == mes_f]
 
     setores_calc = setores_disp if setor_view == "Todos" else [setor_view]
     pcts_setores = {s: _calc_pct_setor(df_f, s) for s in setores_calc}
-    vals_validos  = [v for v in pcts_setores.values() if not pd.isna(v)]
-    media_geral   = sum(vals_validos)/len(vals_validos) if vals_validos else float("nan")
+    vals_validos = [v for v in pcts_setores.values() if not pd.isna(v)]
+    media_geral  = sum(vals_validos)/len(vals_validos) if vals_validos else float("nan")
 
-    # Cards de setores
-    n = len(setores_calc)
-    cols = st.columns(min(n, 4))
-    extra_cols = st.columns(max(n - 4, 1)) if n > 4 else []
-    all_cols = list(cols) + list(extra_cols)
+    st.markdown('<div class="sge-header">📊 Resumo Geral do Diagnóstico</div>', unsafe_allow_html=True)
 
+    cols_cards = st.columns(min(len(setores_calc), 4))
     for i, setor in enumerate(setores_calc):
-        pct = pcts_setores[setor]
-        col = all_cols[i % len(all_cols)]
+        pct   = pcts_setores[setor]
         color = _status_color(pct)
         icon  = _status_icon(pct)
-        with col:
-            pct_str = f"{pct:.0f}%" if not pd.isna(pct) else "—"
+        pct_str = f"{pct:.0f}%" if not pd.isna(pct) else "—"
+        with cols_cards[i % 4]:
             st.markdown(f"""
             <div class="sge-card" style="border-left:5px solid {color};text-align:center">
                 <div style="font-size:0.65rem;font-weight:700;color:#6B7280;
@@ -266,179 +197,139 @@ def page_diagnostico_sge():
                 <div style="font-size:0.75rem;color:{color}">{icon} SGE</div>
             </div>""", unsafe_allow_html=True)
 
-    # Card de média geral
+    mes_label = MESES[mes_f-1] if mes_f else "Todos os meses"
+    media_str = f"{media_geral:.0f}%" if not pd.isna(media_geral) else "—"
     st.markdown(f"""
     <div style="background:linear-gradient(135deg,#2D3192,#1A1A6E);border-radius:12px;
                 padding:0.8rem 1.5rem;display:flex;align-items:center;gap:1rem;
                 margin:0.8rem 0;color:#fff;">
-        <span style="font-size:2.5rem;font-weight:900">
-            {"—" if pd.isna(media_geral) else f"{media_geral:.0f}%"}
-        </span>
+        <span style="font-size:2.5rem;font-weight:900">{media_str}</span>
         <div>
             <div style="font-weight:700;font-size:1rem">Média Geral SGE</div>
-            <div style="font-size:0.75rem;opacity:0.8">
-                {MESES[mes_f-1] if mes_f else "Todos os meses"} / {ano_sel}
-            </div>
+            <div style="font-size:0.75rem;opacity:0.8">{mes_label} / {ano_sel}</div>
         </div>
     </div>""", unsafe_allow_html=True)
 
-    # ── Gráfico Radar dos Setores ────────────────────────────────────────────
-    st.markdown('<div class="sge-header">🕸️ Radar de Desempenho por Setor</div>',
-                unsafe_allow_html=True)
-    radar_vals = [pcts_setores.get(s, 0) or 0 for s in setores_calc]
+    # Radar
+    st.markdown('<div class="sge-header">🕸️ Radar de Desempenho por Setor</div>', unsafe_allow_html=True)
+    radar_vals   = [pcts_setores.get(s, 0) or 0 for s in setores_calc]
     radar_labels = [SETORES_FULL.get(s, s) for s in setores_calc]
-    fig_radar = go.Figure(go.Scatterpolar(
-        r=radar_vals + [radar_vals[0]],
-        theta=radar_labels + [radar_labels[0]],
-        fill='toself',
-        fillcolor='rgba(45,49,146,0.18)',
-        line=dict(color=C_BLUE, width=2.5),
-        marker=dict(color=C_ORANGE, size=8),
-        hovertemplate="%{theta}: %{r:.0f}%<extra></extra>",
-    ))
-    fig_radar.update_layout(
-        polar=dict(
-            radialaxis=dict(visible=True, range=[0, 100], ticksuffix="%",
-                            gridcolor="#E5E7EB", linecolor="#E5E7EB"),
-            angularaxis=dict(gridcolor="#E5E7EB"),
-            bgcolor="rgba(0,0,0,0)",
-        ),
-        paper_bgcolor="rgba(0,0,0,0)",
-        margin=dict(l=60, r=60, t=30, b=30),
-        height=380,
-        showlegend=False,
-    )
-    st.plotly_chart(fig_radar, use_container_width=True, config={"displayModeBar": False})
+    if len(radar_vals) > 2:
+        fig_radar = go.Figure(go.Scatterpolar(
+            r=radar_vals + [radar_vals[0]],
+            theta=radar_labels + [radar_labels[0]],
+            fill='toself',
+            fillcolor='rgba(45,49,146,0.18)',
+            line=dict(color=C_BLUE, width=2.5),
+            marker=dict(color=C_ORANGE, size=8),
+            hovertemplate="%{theta}: %{r:.0f}%<extra></extra>",
+        ))
+        fig_radar.update_layout(
+            polar=dict(
+                radialaxis=dict(visible=True, range=[0,100], ticksuffix="%",
+                                gridcolor="#E5E7EB", linecolor="#E5E7EB"),
+                angularaxis=dict(gridcolor="#E5E7EB"),
+                bgcolor="rgba(0,0,0,0)",
+            ),
+            paper_bgcolor="rgba(0,0,0,0)",
+            margin=dict(l=60, r=60, t=30, b=30),
+            height=380, showlegend=False,
+        )
+        st.plotly_chart(fig_radar, use_container_width=True, config={"displayModeBar": False})
 
-    # ── Memória de Cálculo por Item ──────────────────────────────────────────
-    st.markdown('<div class="sge-header">📋 Memória de Cálculo — Item × Setor</div>',
-                unsafe_allow_html=True)
-    st.caption("Pontuação obtida / Pontuação máxima possível → % atingida por setor")
+    # Tabela memória de cálculo
+    st.markdown('<div class="sge-header">📋 Memória de Cálculo — Item × Setor</div>', unsafe_allow_html=True)
+    st.caption("Pontos obtidos / Pontos máximos (% atingida) por setor")
 
-    # Monta tabela: linhas = assuntos, colunas = setores
     rows_data = []
     for assunto in assuntos_disp:
-        row = {"Item": assunto}
-        regra = next((v for k, v in REGRAS_CALCULO.items()
-                      if k.upper() in assunto.upper() or assunto.upper() in k.upper()),
-                     "Pontuação por evidência apresentada")
-        row["Regra de Cálculo"] = regra
+        regra = next((v for k, v in REGRAS_CALCULO.items() if k.upper() in assunto.upper()), "Por evidência")
+        row = {"Item": assunto, "Regra": regra}
         total_pts = 0; total_max = 0
         for setor in setores_calc:
             pts, maxi, pct = _calc_pct_item_setor(df_f, assunto, setor)
             if pd.isna(pts):
                 row[setor] = "—"
             else:
-                pts_i = int(pts); maxi_i = int(maxi)
-                row[setor] = f"{pts_i}/{maxi_i} ({pct:.0f}%)" if not pd.isna(pct) else "—"
-                total_pts += pts_i; total_max += maxi_i
-        if total_max > 0:
-            row["TOTAL"] = f"{total_pts}/{total_max} ({total_pts/total_max*100:.0f}%)"
-        else:
-            row["TOTAL"] = "—"
+                row[setor] = f"{int(pts)}/{int(maxi)} ({pct:.0f}%)"
+                total_pts += int(pts); total_max += int(maxi)
+        row["TOTAL"] = f"{total_pts}/{total_max} ({total_pts/total_max*100:.0f}%)" if total_max > 0 else "—"
         rows_data.append(row)
 
     df_tabela = pd.DataFrame(rows_data)
 
-    # Estilização
     def _highlight(val):
         if not isinstance(val, str) or val == "—": return ""
         try:
             pct = float(val.split("(")[1].replace("%)", ""))
             if pct >= 80: return "background-color:#ECFDF5;color:#065F46;font-weight:700"
-            elif pct >= 60: return "background-color:#FFFBEB;color:#92400E;font-weight:700"
+            if pct >= 60: return "background-color:#FFFBEB;color:#92400E;font-weight:700"
             return "background-color:#FEF2F2;color:#991B1B;font-weight:700"
         except: return ""
 
-    # Exibição com colunas de configuração
-    cols_show = ["Item","Regra de Cálculo"] + setores_calc + ["TOTAL"]
-    df_show = df_tabela[cols_show].copy()
-
+    cols_show = ["Item","Regra"] + setores_calc + ["TOTAL"]
     st.dataframe(
-        df_show.style.applymap(_highlight, subset=setores_calc + ["TOTAL"]),
-        use_container_width=True,
-        hide_index=True,
-        height=min(600, len(df_show) * 42 + 60),
+        df_tabela[cols_show].style.applymap(_highlight, subset=setores_calc + ["TOTAL"]),
+        use_container_width=True, hide_index=True,
+        height=min(600, len(df_tabela) * 42 + 60),
     )
 
-    # ── Evolução Mensal por Setor ────────────────────────────────────────────
-    st.markdown('<div class="sge-header">📈 Evolução Mensal — % SGE por Setor</div>',
-                unsafe_allow_html=True)
-
+    # Evolução mensal
+    st.markdown('<div class="sge-header">📈 Evolução Mensal — % SGE por Setor</div>', unsafe_allow_html=True)
+    cores = [C_BLUE, C_ORANGE, "#10B981", "#8B5CF6", "#F59E0B", "#EF4444", "#6366F1"]
     df_ano = df[df["ANO"] == ano_sel]
     fig_evo = go.Figure()
-    cores_linha = [C_BLUE, C_ORANGE, "#10B981", "#8B5CF6", "#F59E0B", "#EF4444", "#6366F1"]
-
     for i, setor in enumerate(setores_calc):
         ys = []
         for m in range(1, 13):
             pct = _calc_pct_setor(df_ano, setor, mes=m)
             ys.append(pct if not pd.isna(pct) else None)
-
         fig_evo.add_trace(go.Scatter(
-            x=MESES_ABBR,
-            y=ys,
+            x=MESES_ABBR, y=ys,
             name=SETORES_FULL.get(setor, setor),
             mode="lines+markers",
-            line=dict(color=cores_linha[i % len(cores_linha)], width=2.5),
+            line=dict(color=cores[i % len(cores)], width=2.5),
             marker=dict(size=8),
             connectgaps=False,
-            hovertemplate=f"{setor}: %{{y:.1f}}%<extra></extra>",
         ))
-
     fig_evo.add_hline(y=80, line_dash="dash", line_color=C_GREEN, line_width=1.5,
-                      annotation_text="Meta 80%", annotation_position="top left",
-                      annotation_font=dict(size=9, color=C_GREEN))
+                      annotation_text="Meta 80%", annotation_font=dict(size=9, color=C_GREEN))
     fig_evo.update_layout(
         paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
         font=dict(family="Inter, sans-serif", color="#374151"),
         xaxis=dict(gridcolor="#F0F0F0"),
         yaxis=dict(gridcolor="#F0F0F0", ticksuffix="%", range=[0, 110]),
-        legend=dict(orientation="h", y=-0.15, x=0.5, xanchor="center",
-                    bgcolor="rgba(0,0,0,0)"),
-        margin=dict(l=10, r=10, t=30, b=80),
-        height=400,
-        hovermode="x unified",
+        legend=dict(orientation="h", y=-0.2, x=0.5, xanchor="center", bgcolor="rgba(0,0,0,0)"),
+        margin=dict(l=10, r=10, t=30, b=80), height=400, hovermode="x unified",
     )
     st.plotly_chart(fig_evo, use_container_width=True, config={"displayModeBar": False})
 
-    # ── Drill-down: detalhe de um item específico ────────────────────────────
-    st.markdown('<div class="sge-header">🔎 Detalhe de Item por Mês</div>',
-                unsafe_allow_html=True)
-
-    item_sel = st.selectbox("Selecione o Item do SGE", assuntos_disp, key="sge_item_detail")
-    regra_sel = next((v for k, v in REGRAS_CALCULO.items()
-                      if k.upper() in item_sel.upper() or item_sel.upper() in k.upper()),
-                     "Pontuação por evidência apresentada")
+    # Drill-down por item
+    st.markdown('<div class="sge-header">🔎 Detalhe de Item por Mês</div>', unsafe_allow_html=True)
+    item_sel = st.selectbox("Selecione o Item", assuntos_disp, key="sge_item_detail")
+    regra_sel = next((v for k, v in REGRAS_CALCULO.items() if k.upper() in item_sel.upper()), "Por evidência")
     st.markdown(f'<div class="sge-regra">📏 Regra: {regra_sel}</div>', unsafe_allow_html=True)
 
-    df_item_ano = df[df["ANO"] == ano_sel]
     fig_item = go.Figure()
     for i, setor in enumerate(setores_calc):
         ys = []
         for m in range(1, 13):
-            _, _, pct = _calc_pct_item_setor(df_item_ano, item_sel, setor, mes=m)
+            _, _, pct = _calc_pct_item_setor(df_ano, item_sel, setor, mes=m)
             ys.append(pct if not pd.isna(pct) else None)
         fig_item.add_trace(go.Bar(
             name=SETORES_FULL.get(setor, setor),
-            x=MESES_ABBR,
-            y=ys,
-            marker_color=cores_linha[i % len(cores_linha)],
-            hovertemplate=f"{setor}: %{{y:.1f}}%<extra></extra>",
+            x=MESES_ABBR, y=ys,
+            marker_color=cores[i % len(cores)],
         ))
-
     fig_item.add_hline(y=80, line_dash="dash", line_color=C_GREEN, line_width=1.5,
-                       annotation_text="80%", annotation_position="top left",
-                       annotation_font=dict(size=9, color=C_GREEN))
+                       annotation_text="80%", annotation_font=dict(size=9, color=C_GREEN))
     fig_item.update_layout(
         barmode="group",
         paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
         font=dict(family="Inter, sans-serif", color="#374151"),
         xaxis=dict(gridcolor="#F0F0F0"),
         yaxis=dict(gridcolor="#F0F0F0", ticksuffix="%", range=[0, 115]),
-        legend=dict(orientation="h", y=-0.2, x=0.5, xanchor="center",
-                    bgcolor="rgba(0,0,0,0)"),
-        margin=dict(l=10, r=10, t=30, b=90),
-        height=380,
+        legend=dict(orientation="h", y=-0.25, x=0.5, xanchor="center", bgcolor="rgba(0,0,0,0)"),
+        margin=dict(l=10, r=10, t=30, b=90), height=380,
     )
     st.plotly_chart(fig_item, use_container_width=True, config={"displayModeBar": False})
