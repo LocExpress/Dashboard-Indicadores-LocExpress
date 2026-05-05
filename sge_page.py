@@ -7,6 +7,7 @@ import pandas as pd
 import plotly.graph_objects as go
 import requests
 import io
+import unicodedata
 
 # URLs publicadas via "Arquivo > Publicar na web"
 SGE_GERAL_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vR7vqbGSRITRkAikpISxGrIyAXSVr2HZllFSiYhIBIcye5_PsrTcGVAs1THfIyhqw/pub?gid=225370926&single=true&output=csv"
@@ -27,6 +28,11 @@ SETORES_FULL = {
 MESES = ["JANEIRO","FEVEREIRO","MARÇO","ABRIL","MAIO","JUNHO",
          "JULHO","AGOSTO","SETEMBRO","OUTUBRO","NOVEMBRO","DEZEMBRO"]
 MESES_ABBR = ["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"]
+
+def _norm(s):
+    """Remove acentos e padroniza string para comparação."""
+    return unicodedata.normalize("NFD", str(s).upper()).encode("ascii", "ignore").decode("ascii").strip()
+
 
 REGRAS_CALCULO = {
     "INDICADORES DE DESEMPENHO": "1 indicador = 3 pts; 2 indicadores = 5 pts",
@@ -61,6 +67,8 @@ def load_sge_data():
     try:
         r = requests.get(SGE_GERAL_URL, timeout=15)
         r.raise_for_status()
+        # Força UTF-8 para preservar acentos corretamente
+        r.encoding = "utf-8"
         df = pd.read_csv(io.StringIO(r.text))
         df.columns = [c.strip() for c in df.columns]
         if df.empty or len(df.columns) < 3:
@@ -100,8 +108,8 @@ def _parse_sge(df_raw):
     return df
 
 def _calc_pct_item_setor(df, assunto, setor, mes=None, ano=None):
-    mask = (df["ASSUNTO"].str.strip().str.upper() == assunto.strip().upper()) & \
-           (df["SETOR"].str.strip().str.upper() == setor.strip().upper())
+    mask = (df["ASSUNTO"].str.strip().apply(_norm) == _norm(assunto)) & \
+           (df["SETOR"].str.strip().apply(_norm) == _norm(setor))
     if mes: mask &= (df["MES"] == mes)
     if ano: mask &= (df["ANO"] == ano)
     avaliados = df[mask & df["AVALIADO"]]
@@ -111,7 +119,7 @@ def _calc_pct_item_setor(df, assunto, setor, mes=None, ano=None):
     return pts, maxi, (pts/maxi*100) if maxi > 0 else float("nan")
 
 def _calc_pct_setor(df, setor, mes=None, ano=None):
-    mask = df["SETOR"].str.strip().str.upper() == setor.strip().upper()
+    mask = df["SETOR"].str.strip().apply(_norm) == _norm(setor)
     if mes: mask &= (df["MES"] == mes)
     if ano: mask &= (df["ANO"] == ano)
     sub = df[mask & df["AVALIADO"]]
@@ -242,7 +250,7 @@ def page_diagnostico_sge():
         desc_rows = []
         for assunto in assuntos_disp:
             regra = next((v for k, v in REGRAS_CALCULO.items()
-                          if k.upper() in assunto.upper() or assunto.upper() in k.upper()),
+                          if _norm(k) in _norm(assunto) or _norm(assunto) in _norm(k)),
                          "Pontuação por evidência apresentada")
             desc_rows.append({"Item SGE": assunto, "Regra de Cálculo": regra})
         df_desc = pd.DataFrame(desc_rows)
