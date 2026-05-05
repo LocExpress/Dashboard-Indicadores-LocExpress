@@ -180,7 +180,7 @@ def page_orcamento():
 
     _kcard(k1, "💰 Total Orçado", total_geral, C_BLUE)
     _kcard(k2, "📋 Nº de Itens",  n_itens,     C_ORANGE, fmt_brl=False)
-    _kcard(k3, "🏆 Maior Setor",  maior_val,   C_INDIGO if False else "#6366F1")
+    _kcard(k3, "🏆 Maior Setor",  maior_val,   "#6366F1")
     with k4:
         st.markdown(f"""
         <div class="orc-card" style="border-left:5px solid #10B981">
@@ -314,4 +314,3 @@ def page_orcamento():
         height=420,
     )
     st.plotly_chart(fig_pie, use_container_width=True, config={"displayModeBar": False})
-
