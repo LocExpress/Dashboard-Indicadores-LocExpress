@@ -1199,17 +1199,15 @@ def main():
         )
         st.markdown("<div style='margin-top:0.8rem'></div>", unsafe_allow_html=True)
 
-tab_geral, tab_depto, tab_sge, tab_orc = st.tabs([
-    "📊  Visão Geral", "🏢  Por Departamento", "🔍  Diagnóstico SGE", "💰  Orçamento"
-])
-with tab_geral:
-    page_visao_geral(df_f)
-with tab_depto:
-    page_por_departamento(df_f, df, sel_ano)
-with tab_sge:
-    page_diagnostico_sge()
-with tab_orc:
-    page_orcamento()
+    tab_geral, tab_depto, tab_sge, tab_orc = st.tabs(["📊  Visão Geral", "🏢  Por Departamento", "🔍  Diagnóstico SGE", "💰  Orçamento"])
+    with tab_geral:
+        page_visao_geral(df_f)
+    with tab_depto:
+        page_por_departamento(df_f, df, sel_ano)
+    with tab_sge:
+        page_diagnostico_sge()
+    with tab_orc:
+        page_orcamento()
 
 
 if __name__ == "__main__":
