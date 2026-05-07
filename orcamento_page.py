@@ -1,316 +1,493 @@
 """
-orcamento_page.py — Aba Orçamento por Setor para o Dashboard LocExpress
+orcamento_page.py — Módulo de Orçamento BI | LocExpress Franchising
+Estrutura analítica: meses em linhas, Orçado × Realizado separados por Tipo_Valor.
 """
 
+import re
 import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
-import requests
-import io
-import unicodedata
-import re
 
-ORC_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vR8iI90QwsF9tUR0z8VATAKDyv8B2vf6tNJ87HaDF9sT8uibM9-t1XX58IaQ6tcXhYV3TFWQVD19CiQ/pub?gid=615632484&single=true&output=csv"
+import utils
 
-C_BLUE   = "#2D3192"
+# ─── URL da Base de Orçamento ─────────────────────────────────────────────────
+# Publique a aba 'base_orcamento_bi' no Google Sheets como CSV e cole a URL aqui.
+# Arquivo → Compartilhar → Publicar na web → Selecionar aba → CSV → Publicar
+ORCAMENTO_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vR8iI90QwsF9tUR0z8VATAKDyv8B2vf6tNJ87HaDF9sT8uibM9-t1XX58IaQ6tcXhYV3TFWQVD19CiQ/pub?gid=615632484&single=true&output=csv"
+
+# ─── Colunas obrigatórias ─────────────────────────────────────────────────────
+_REQUIRED = {"Data", "Ano", "Mês", "Área", "Categoria", "Empresa", "Tipo_Valor", "Valor"}
+
+# ─── Paleta LocExpress ────────────────────────────────────────────────────────
+C_BLUE   = "#003087"
 C_ORANGE = "#F47920"
 C_GREEN  = "#00C853"
 C_YELLOW = "#FFB300"
 C_RED    = "#F44336"
-C_GRAY   = "#6B7280"
+C_GRAY   = "#F3F4F6"
 
-MESES_COLS = ["Jan","Fev","Mar","Abril","Maio","Junho",
-              "Julho","Agosto","Setembro","Outubro","Novembro","Dezembro"]
-MESES_ABBR = ["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"]
+_CFG = {"displayModeBar": False}
 
-def _norm(s):
-    return unicodedata.normalize("NFD", str(s).upper()).encode("ascii","ignore").decode("ascii").strip()
+_L = dict(
+    paper_bgcolor="rgba(0,0,0,0)",
+    plot_bgcolor="rgba(0,0,0,0)",
+    font=dict(family="Inter, Segoe UI, sans-serif", color="#374151", size=12),
+    margin=dict(l=10, r=10, t=44, b=10),
+    hoverlabel=dict(bgcolor="#FFFFFF", bordercolor="#E5E7EB", font_size=12),
+    legend=dict(orientation="h", yanchor="bottom", y=1.02,
+                xanchor="right", x=1, bgcolor="rgba(0,0,0,0)"),
+)
 
-def _parse_brl(v):
-    """Converte 'R$17.944,04' ou '17091' ou '5.574,00' para float."""
-    if pd.isna(v): return 0.0
-    s = str(v).strip()
-    if s in ("", "-", "nan", "None"): return 0.0
-    s = s.replace("R$","").replace(" ","")
-    # formato BR: 17.944,04
+
+def _title(text: str) -> dict:
+    return dict(text=text, font=dict(size=13, color=C_BLUE, weight="bold"), x=0.01)
+
+
+# ─── Limpeza de valor em formato brasileiro ───────────────────────────────────
+
+def _clean_brl(val) -> float:
+    """Converte 'R$ 1.500,00' | '1500,00' | '1500.00' → float. Vazio → NaN."""
+    if pd.isna(val):
+        return float("nan")
+    s = str(val).strip()
+    if s in ("", "-", "n/a", "N/A", "nan", "None"):
+        return float("nan")
+    s = re.sub(r"[R$\s]", "", s).strip()
     if "," in s and "." in s:
-        s = s.replace(".","").replace(",",".")
+        s = s.replace(".", "").replace(",", ".")
     elif "," in s:
-        s = s.replace(",",".")
-    # remove pontos restantes que sejam separador de milhar
-    s = re.sub(r'\.(?=\d{3}(?:[^\d]|$))', '', s)
-    try: return float(s)
-    except: return 0.0
+        s = s.replace(",", ".")
+    try:
+        return float(s)
+    except ValueError:
+        return float("nan")
+
+
+# ─── Formatação ───────────────────────────────────────────────────────────────
+
+def _fmt_brl(value) -> str:
+    if pd.isna(value):
+        return "R$ 0,00"
+    v = float(value)
+    if abs(v) >= 1_000_000:
+        return f"R$ {v / 1_000_000:.2f}M".replace(".", ",")
+    if abs(v) >= 1_000:
+        fmt = f"{abs(v):,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+        return f"{'−' if v < 0 else ''}R$ {fmt}"
+    sign = "−" if v < 0 else ""
+    return f"{sign}R$ {abs(v):.2f}".replace(".", ",")
+
+
+def _fmt_pct(value) -> str:
+    if pd.isna(value):
+        return "—"
+    return f"{float(value):.1f}%"
+
+
+def _kpi_card(label: str, value: str, color: str, sub: str = "") -> str:
+    sub_html = f"<div class='kpi-status' style='color:{color}'>{sub}</div>" if sub else ""
+    return (
+        f'<div class="kpi-card" style="border-left-color:{color}">'
+        f'<div class="kpi-label">{label}</div>'
+        f'<div class="kpi-value" style="color:{color}">{value}</div>'
+        f'{sub_html}</div>'
+    )
+
+
+# ─── Carregamento de Dados ────────────────────────────────────────────────────
 
 @st.cache_data(ttl=300, show_spinner=False)
-def load_orc_data():
+def load_orcamento():
+    """
+    Carrega e normaliza a base de orçamento BI.
+    Retorna (DataFrame, None) ou (None, mensagem_de_erro).
+    """
+    if not ORCAMENTO_URL:
+        return None, (
+            "URL da planilha de orçamento não configurada.\n\n"
+            "Atualize a variável `ORCAMENTO_URL` em `orcamento_page.py` com a URL CSV "
+            "gerada ao publicar a aba `base_orcamento_bi` no Google Sheets."
+        )
+
     try:
-        r = requests.get(ORC_URL, timeout=15)
-        r.raise_for_status()
-        r.encoding = "utf-8"
-        df = pd.read_csv(io.StringIO(r.text))
-        df.columns = [str(c).strip() for c in df.columns]
-        return df, None
+        df = pd.read_csv(ORCAMENTO_URL)
     except Exception as exc:
-        return None, str(exc)
+        return None, f"Não foi possível conectar à planilha de orçamento.\n\nDetalhe: {exc}"
 
-def _process(df_raw):
-    """Normaliza e processa a planilha de orçamento."""
-    df = df_raw.copy()
+    df.columns = [c.strip() for c in df.columns]
 
-    # Detectar colunas
-    col_cat  = next((c for c in df.columns if _norm(c) in ("CATEGORIA","SETOR")), df.columns[0])
-    col_item = next((c for c in df.columns if "ITEM" in _norm(c) or "DESPESA" in _norm(c)), df.columns[1])
-    col_emp  = next((c for c in df.columns if "EMPRESA" in _norm(c) or "EMIT" in _norm(c)), None)
-    col_just = next((c for c in df.columns if "JUSTIF" in _norm(c) or "ROI" in _norm(c)), None)
-    col_total= next((c for c in df.columns if "TOTAL" in _norm(c) and "ANUAL" in _norm(c)), None)
+    if df.empty:
+        return None, "A base de orçamento está vazia."
 
-    # Colunas de meses — detecta pelos nomes
-    mes_map = {}
-    for c in df.columns:
-        cn = _norm(c)
-        for i, m in enumerate(["JAN","FEV","MAR","ABR","ABRIL","MAI","MAIO","JUN","JUNHO",
-                                "JUL","JULHO","AGO","AGOSTO","SET","SETEMBRO",
-                                "OUT","OUTUBRO","NOV","NOVEMBRO","DEZ","DEZEMBRO"]):
-            if cn.startswith(m):
-                idx = [0,1,2,3,3,4,4,5,5,6,6,7,7,8,8,9,9,10,10,11,11][i]
-                if idx not in mes_map:
-                    mes_map[idx] = c
-                break
+    missing = _REQUIRED - set(df.columns)
+    if missing:
+        lista = ", ".join(f"`{c}`" for c in sorted(missing))
+        return None, f"Colunas ausentes na base: {lista}"
 
-    # Preenche categoria (forward fill)
-    df[col_cat] = df[col_cat].replace("", pd.NA).ffill()
-    df = df.dropna(subset=[col_cat])
-    df = df[df[col_cat].astype(str).str.strip() != ""]
+    # Data → datetime
+    df["Data"] = pd.to_datetime(df["Data"], dayfirst=True, errors="coerce")
 
-    # Remove linhas de totais/cabeçalhos internos
-    df = df[~df[col_cat].astype(str).str.upper().str.contains("TOTAL|HEADER|MÊS|EMPRESA|FATURAMENTO")]
-    df = df[df[col_item].notna() & (df[col_item].astype(str).str.strip() != "")]
+    # Ano e Mês: preferir coluna explícita, fallback para Data
+    df["Ano"] = pd.to_numeric(df["Ano"], errors="coerce").fillna(df["Data"].dt.year).astype("Int64")
+    df["Mês"] = pd.to_numeric(df["Mês"], errors="coerce").fillna(df["Data"].dt.month).astype("Int64")
 
-    rows = []
-    for _, r in df.iterrows():
-        cat  = str(r[col_cat]).strip().title()
-        item = str(r[col_item]).strip()
-        emp  = str(r[col_emp]).strip() if col_emp else ""
-        just = str(r[col_just]).strip() if col_just else ""
-        total_anual = _parse_brl(r[col_total]) if col_total else 0.0
+    # Valor com suporte a formato BR (R$, ponto, vírgula)
+    df["Valor"] = df["Valor"].apply(_clean_brl)
 
-        mensal = {}
-        for idx, col in mes_map.items():
-            mensal[idx] = _parse_brl(r[col])
+    # Strings obrigatórias
+    for col in ("Área", "Categoria", "Empresa", "Tipo_Valor"):
+        df[col] = df[col].fillna("").astype(str).str.strip()
 
-        # Se total não veio da planilha, calcula
-        if total_anual == 0.0:
-            total_anual = sum(mensal.values())
+    # Justificativa opcional
+    if "Justificativa_ROI" not in df.columns:
+        df["Justificativa_ROI"] = ""
+    df["Justificativa_ROI"] = df["Justificativa_ROI"].fillna("").astype(str).str.strip()
 
-        if total_anual == 0.0 and all(v == 0 for v in mensal.values()):
-            continue
+    df["MêsNome"] = df["Mês"].map(utils.MESES_PT).fillna(df["Mês"].astype(str))
 
-        row = {"Categoria": cat, "Item": item, "Empresa": emp,
-               "Justificativa": just, "Total_Anual": total_anual}
-        for i in range(12):
-            row[MESES_ABBR[i]] = mensal.get(i, 0.0)
-        rows.append(row)
+    return df, None
 
-    return pd.DataFrame(rows) if rows else pd.DataFrame()
 
+# ─── Gráficos ─────────────────────────────────────────────────────────────────
+
+def _chart_orc_real_mensal(df_m: pd.DataFrame) -> go.Figure:
+    """Barras agrupadas Orçado × Realizado por mês."""
+    fig = go.Figure()
+    fig.add_trace(go.Bar(
+        name="Orçado", x=df_m["Label"], y=df_m["Orçado"],
+        marker_color=C_BLUE, opacity=0.85,
+        text=[_fmt_brl(v) for v in df_m["Orçado"]],
+        textposition="outside", textfont=dict(size=8, color=C_BLUE),
+        hovertemplate="%{x}<br>Orçado: %{text}<extra></extra>",
+    ))
+    fig.add_trace(go.Bar(
+        name="Realizado", x=df_m["Label"], y=df_m["Realizado"],
+        marker_color=C_ORANGE, opacity=0.9,
+        text=[_fmt_brl(v) for v in df_m["Realizado"]],
+        textposition="outside", textfont=dict(size=8, color=C_ORANGE),
+        hovertemplate="%{x}<br>Realizado: %{text}<extra></extra>",
+    ))
+    fig.update_layout(
+        **_L, title=_title("Orçado × Realizado por Mês"),
+        barmode="group", bargap=0.22, bargroupgap=0.05,
+        xaxis=dict(gridcolor="#F0F0F0"),
+        yaxis=dict(gridcolor="#F0F0F0"),
+    )
+    return fig
+
+
+def _chart_orc_real_area(df_a: pd.DataFrame) -> go.Figure:
+    """Barras agrupadas Orçado × Realizado por área."""
+    tick_angle = -20 if len(df_a) > 4 else 0
+    fig = go.Figure()
+    fig.add_trace(go.Bar(
+        name="Orçado", x=df_a["Área"], y=df_a["Orçado"],
+        marker_color=C_BLUE, opacity=0.85,
+        text=[_fmt_brl(v) for v in df_a["Orçado"]],
+        textposition="outside", textfont=dict(size=8, color=C_BLUE),
+        hovertemplate="%{x}<br>Orçado: %{text}<extra></extra>",
+    ))
+    fig.add_trace(go.Bar(
+        name="Realizado", x=df_a["Área"], y=df_a["Realizado"],
+        marker_color=C_ORANGE, opacity=0.9,
+        text=[_fmt_brl(v) for v in df_a["Realizado"]],
+        textposition="outside", textfont=dict(size=8, color=C_ORANGE),
+        hovertemplate="%{x}<br>Realizado: %{text}<extra></extra>",
+    ))
+    fig.update_layout(
+        **_L, title=_title("Orçado × Realizado por Área"),
+        barmode="group", bargap=0.22, bargroupgap=0.05,
+        xaxis=dict(gridcolor="#F0F0F0", tickangle=tick_angle),
+        yaxis=dict(gridcolor="#F0F0F0"),
+    )
+    return fig
+
+
+def _chart_desvio_area(df_a: pd.DataFrame) -> go.Figure:
+    """Barras horizontais de desvio (Realizado − Orçado) por área."""
+    df_s = df_a.sort_values("Desvio").reset_index(drop=True)
+    colors = [C_GREEN if v <= 0 else C_RED for v in df_s["Desvio"]]
+    fig = go.Figure(go.Bar(
+        x=df_s["Desvio"], y=df_s["Área"], orientation="h",
+        marker_color=colors,
+        text=[_fmt_brl(v) for v in df_s["Desvio"]],
+        textposition="outside",
+        textfont=dict(size=10, color="#374151", weight="bold"),
+        hovertemplate="%{y}<br>Desvio: %{text}<extra></extra>",
+    ))
+    fig.add_vline(x=0, line_color="#374151", line_width=1)
+    fig.update_layout(
+        **_L, title=_title("Desvio por Área (Realizado − Orçado)"),
+        showlegend=False,
+        xaxis=dict(gridcolor="#F0F0F0"),
+        yaxis=dict(gridcolor="rgba(0,0,0,0)", automargin=True),
+        height=max(280, len(df_s) * 54 + 90),
+    )
+    return fig
+
+
+def _chart_evolucao_mensal(df_m: pd.DataFrame) -> go.Figure:
+    """Linha de evolução mensal Orçado × Realizado com área preenchida."""
+    fig = go.Figure()
+    fig.add_trace(go.Scatter(
+        x=df_m["Label"], y=df_m["Orçado"],
+        name="Orçado", mode="lines+markers",
+        line=dict(color=C_BLUE, width=2, dash="dot"),
+        marker=dict(size=7, color=C_BLUE),
+        text=[_fmt_brl(v) for v in df_m["Orçado"]],
+        hovertemplate="%{x}<br>Orçado: %{text}<extra></extra>",
+    ))
+    fig.add_trace(go.Scatter(
+        x=df_m["Label"], y=df_m["Realizado"],
+        name="Realizado", mode="lines+markers+text",
+        line=dict(color=C_ORANGE, width=3),
+        marker=dict(size=9, color=C_ORANGE, line=dict(color=C_BLUE, width=2)),
+        fill="tonexty", fillcolor="rgba(244,121,32,0.10)",
+        text=[_fmt_brl(v) if v > 0 else "" for v in df_m["Realizado"]],
+        textposition="top center",
+        textfont=dict(size=9, color=C_ORANGE, weight="bold"),
+        hovertemplate="%{x}<br>Realizado: %{text}<extra></extra>",
+    ))
+    fig.update_layout(
+        **_L, title=_title("Evolução Mensal do Orçamento"),
+        xaxis=dict(gridcolor="#F0F0F0"),
+        yaxis=dict(gridcolor="#F0F0F0"),
+        hovermode="x unified",
+    )
+    return fig
+
+
+# ─── Helpers de agrupamento ───────────────────────────────────────────────────
+
+def _grp_mensal(df: pd.DataFrame, tipo: str) -> pd.DataFrame:
+    sub = df[df["Tipo_Valor"] == tipo]
+    if sub.empty:
+        return pd.DataFrame(columns=["Ano", "Mês", "MêsNome", "Valor"])
+    return sub.groupby(["Ano", "Mês", "MêsNome"], as_index=False)["Valor"].sum()
+
+
+def _grp_area(df: pd.DataFrame, tipo: str) -> pd.DataFrame:
+    sub = df[df["Tipo_Valor"] == tipo]
+    if sub.empty:
+        return pd.DataFrame(columns=["Área", "Valor"])
+    return sub.groupby("Área", as_index=False)["Valor"].sum()
+
+
+def _build_monthly(df_f: pd.DataFrame) -> pd.DataFrame:
+    """Pivô mensal com Orçado e Realizado — robusto a ausência de qualquer tipo."""
+    orc_m  = _grp_mensal(df_f, "Orçado")
+    real_m = _grp_mensal(df_f, "Realizado")
+
+    keys = pd.concat(
+        [orc_m[["Ano", "Mês", "MêsNome"]], real_m[["Ano", "Mês", "MêsNome"]]]
+    ).drop_duplicates()
+
+    df_m = (
+        keys
+        .merge(orc_m.rename(columns={"Valor": "Orçado"}),  on=["Ano", "Mês", "MêsNome"], how="left")
+        .merge(real_m.rename(columns={"Valor": "Realizado"}), on=["Ano", "Mês", "MêsNome"], how="left")
+        .sort_values(["Ano", "Mês"])
+        .reset_index(drop=True)
+    )
+    df_m["Orçado"]    = df_m["Orçado"].fillna(0.0)
+    df_m["Realizado"] = df_m["Realizado"].fillna(0.0)
+
+    multi = df_m["Ano"].nunique() > 1
+    df_m["Label"] = df_m.apply(
+        lambda r: (
+            f"{utils.MESES_ABBR.get(int(r['Mês']), str(r['Mês']))}/{int(r['Ano'])}"
+            if multi else str(r["MêsNome"])
+        ), axis=1,
+    )
+    return df_m
+
+
+def _build_area(df_f: pd.DataFrame) -> pd.DataFrame:
+    """Pivô por área com Orçado e Realizado."""
+    orc_a  = _grp_area(df_f, "Orçado")
+    real_a = _grp_area(df_f, "Realizado")
+
+    all_areas = pd.Series(
+        list(set(orc_a["Área"].tolist() + real_a["Área"].tolist())), name="Área"
+    ).to_frame()
+
+    df_a = (
+        all_areas
+        .merge(orc_a.rename(columns={"Valor": "Orçado"}),    on="Área", how="left")
+        .merge(real_a.rename(columns={"Valor": "Realizado"}), on="Área", how="left")
+    )
+    df_a["Orçado"]    = df_a["Orçado"].fillna(0.0)
+    df_a["Realizado"] = df_a["Realizado"].fillna(0.0)
+    df_a["Desvio"]    = df_a["Realizado"] - df_a["Orçado"]
+    return df_a
+
+
+# ─── Página principal ─────────────────────────────────────────────────────────
 
 def page_orcamento():
-    st.markdown("""
-    <style>
-    .orc-header { font-size:0.9rem; font-weight:700; color:#2D3192;
-        border-bottom:2.5px solid #F47920; padding-bottom:0.3rem; margin:1rem 0 0.6rem; }
-    .orc-card { background:#fff; border-radius:12px; padding:1rem 1.2rem;
-        box-shadow:0 2px 12px rgba(0,0,0,0.07); text-align:center; }
-    </style>
-    """, unsafe_allow_html=True)
+    st.markdown('<div class="sec-header">💰 Orçamento Setorial BI</div>', unsafe_allow_html=True)
 
-    st.markdown("""
-    <div style='background:linear-gradient(135deg,#2D3192 0%,#F47920 100%);
-                border-radius:12px;padding:1.2rem 1.8rem;margin-bottom:1.2rem;color:#fff;'>
-        <div style='font-size:1.3rem;font-weight:900'>💰 Orçamento por Setor</div>
-        <div style='font-size:0.85rem;opacity:0.88;margin-top:4px'>
-            Previsão orçamentária 2026 — Valores por categoria, item e mês
-        </div>
-    </div>
-    """, unsafe_allow_html=True)
+    with st.spinner("Carregando base de orçamento..."):
+        df, error = load_orcamento()
 
-    with st.spinner("Carregando orçamento..."):
-        df_raw, err = load_orc_data()
+    if error:
+        st.error(f"❌ **Erro ao carregar orçamento**\n\n{error}")
+        st.markdown("""
+**💡 Como configurar:**
+1. Abra a planilha de orçamento no Google Sheets
+2. Vá em **Arquivo → Compartilhar → Publicar na web**
+3. Selecione a aba **`base_orcamento_bi`** e o formato **CSV**
+4. Clique em **Publicar** e copie a URL gerada
+5. Cole a URL na variável `ORCAMENTO_URL` no arquivo `orcamento_page.py`
 
-    if err or df_raw is None:
-        st.error(f"❌ Erro ao carregar orçamento: {err}")
+**Colunas obrigatórias:** `Data`, `Ano`, `Mês`, `Área`, `Categoria`, `Empresa`, `Tipo_Valor`, `Valor`
+
+**Valores aceitos em `Tipo_Valor`:** `Orçado` | `Realizado`
+        """)
         if st.button("🔄 Tentar Novamente", key="orc_retry"):
             st.cache_data.clear()
             st.rerun()
         return
 
-    df = _process(df_raw)
-    if df.empty:
-        st.warning("⚠️ Nenhum dado de orçamento encontrado.")
+    # ─── Filtros (dentro da aba, não polui a sidebar) ─────────────────────────
+    anos     = sorted(df["Ano"].dropna().unique().tolist())
+    meses    = sorted(df["Mês"].dropna().unique().tolist())
+    areas    = sorted(a for a in df["Área"].unique() if a)
+    cats     = sorted(c for c in df["Categoria"].unique() if c)
+    empresas = sorted(e for e in df["Empresa"].unique() if e)
+    tipos    = sorted(t for t in df["Tipo_Valor"].unique() if t)
+
+    with st.expander("🔍 Filtros do Orçamento", expanded=True):
+        fc1, fc2, fc3 = st.columns(3)
+        fc4, fc5, fc6 = st.columns(3)
+        with fc1:
+            sel_ano = st.multiselect("Ano", anos, default=anos, key="orc_ano")
+        with fc2:
+            sel_mes = st.multiselect(
+                "Mês", meses, default=meses, key="orc_mes",
+                format_func=lambda m: utils.MESES_PT.get(int(m), str(m)),
+            )
+        with fc3:
+            sel_area = st.multiselect("Área", areas, default=areas, key="orc_area")
+        with fc4:
+            sel_cat = st.multiselect("Categoria", cats, default=cats, key="orc_cat")
+        with fc5:
+            sel_emp = st.multiselect("Empresa", empresas, default=empresas, key="orc_emp")
+        with fc6:
+            sel_tipo = st.multiselect("Tipo de Valor", tipos, default=tipos, key="orc_tipo")
+
+    # Aplicar filtros
+    if not sel_ano or not sel_mes or not sel_area or not sel_cat or not sel_emp or not sel_tipo:
+        st.warning("⚠️ Selecione ao menos uma opção em cada filtro.")
         return
 
-    categorias = sorted(df["Categoria"].unique().tolist())
+    df_f = df[
+        df["Ano"].isin(sel_ano)
+        & df["Mês"].isin(sel_mes)
+        & df["Área"].isin(sel_area)
+        & df["Categoria"].isin(sel_cat)
+        & df["Empresa"].isin(sel_emp)
+        & df["Tipo_Valor"].isin(sel_tipo)
+    ].copy()
 
-    # ── Filtros ──────────────────────────────────────────────────────────────
-    fc1, fc2 = st.columns([2,1])
-    with fc1:
-        cats_sel = st.multiselect("🏢 Setor / Categoria", categorias,
-                                   default=categorias, key="orc_cat")
-    with fc2:
-        view_mes = st.selectbox("📆 Visualizar mês", ["Anual"]+MESES_ABBR, key="orc_mes")
+    if df_f.empty:
+        st.warning("⚠️ Nenhum registro encontrado para os filtros selecionados.")
+        return
 
-    df_f = df[df["Categoria"].isin(cats_sel)] if cats_sel else df
+    # ─── Totais ───────────────────────────────────────────────────────────────
+    orc  = df_f[df_f["Tipo_Valor"] == "Orçado"]["Valor"].sum()
+    real = (
+        df_f[df_f["Tipo_Valor"] == "Realizado"]["Valor"].sum()
+        if "Realizado" in df_f["Tipo_Valor"].values
+        else 0.0
+    )
+    orc  = 0.0 if pd.isna(orc)  else float(orc)
+    real = 0.0 if pd.isna(real) else float(real)
 
-    # ── KPIs de Topo ─────────────────────────────────────────────────────────
-    total_geral = df_f["Total_Anual"].sum()
-    n_itens     = len(df_f)
-    maior_cat   = df_f.groupby("Categoria")["Total_Anual"].sum().idxmax() if not df_f.empty else "—"
-    maior_val   = df_f.groupby("Categoria")["Total_Anual"].sum().max() if not df_f.empty else 0
+    desvio_brl = real - orc
+    desvio_pct = (desvio_brl / orc * 100) if orc != 0 else float("nan")
+    execucao   = (real / orc * 100)        if orc != 0 else float("nan")
 
-    k1, k2, k3, k4 = st.columns(4)
-    def _kcard(col, label, value, color, fmt_brl=True):
-        val_str = f"R$ {value:,.2f}".replace(",","X").replace(".",",").replace("X",".") if fmt_brl else str(value)
-        col.markdown(f"""
-        <div class="orc-card" style="border-left:5px solid {color}">
-            <div style="font-size:0.65rem;font-weight:700;color:#6B7280;
-                        text-transform:uppercase;letter-spacing:0.06em">{label}</div>
-            <div style="font-size:1.5rem;font-weight:900;color:{color};line-height:1.2">{val_str}</div>
-        </div>""", unsafe_allow_html=True)
+    # ─── Aviso: sem Realizado lançado ────────────────────────────────────────
+    if real == 0 and "Realizado" not in df_f["Tipo_Valor"].values:
+        st.markdown(
+            '<div class="info-box">ℹ️ <strong>Realizado ainda não lançado.</strong> '
+            "O dashboard está operando apenas com dados de Orçado. "
+            "Os gráficos serão atualizados automaticamente quando o Realizado for inserido.</div>",
+            unsafe_allow_html=True,
+        )
+        st.markdown("<div style='margin-top:0.6rem'></div>", unsafe_allow_html=True)
 
-    _kcard(k1, "💰 Total Orçado", total_geral, C_BLUE)
-    _kcard(k2, "📋 Nº de Itens",  n_itens,     C_ORANGE, fmt_brl=False)
-    _kcard(k3, "🏆 Maior Setor",  maior_val,   "#6366F1")
+    # ─── KPI Cards ───────────────────────────────────────────────────────────
+    st.markdown("<div style='margin-top:0.6rem'></div>", unsafe_allow_html=True)
+    k1, k2, k3, k4, k5 = st.columns(5)
+
+    with k1:
+        st.markdown(_kpi_card("💰 Orçado Total", _fmt_brl(orc), C_BLUE), unsafe_allow_html=True)
+    with k2:
+        r_color = C_GRAY if real == 0 else (C_GREEN if real <= orc else C_RED)
+        st.markdown(_kpi_card("✅ Realizado Total", _fmt_brl(real), r_color,
+                              "Sem lançamento" if real == 0 else ""), unsafe_allow_html=True)
+    with k3:
+        d_color = C_GRAY if real == 0 else (C_GREEN if desvio_brl <= 0 else C_RED)
+        st.markdown(_kpi_card("📉 Desvio R$", _fmt_brl(desvio_brl), d_color,
+                              "Realizado − Orçado"), unsafe_allow_html=True)
     with k4:
-        st.markdown(f"""
-        <div class="orc-card" style="border-left:5px solid #10B981">
-            <div style="font-size:0.65rem;font-weight:700;color:#6B7280;
-                        text-transform:uppercase;letter-spacing:0.06em">🏆 Setor Líder</div>
-            <div style="font-size:1.1rem;font-weight:900;color:#10B981;line-height:1.3">{maior_cat}</div>
-        </div>""", unsafe_allow_html=True)
+        p_color = C_GRAY if pd.isna(desvio_pct) else (C_GREEN if desvio_pct <= 0 else C_RED)
+        st.markdown(_kpi_card("📊 Desvio %", _fmt_pct(desvio_pct), p_color,
+                              "Desvio / Orçado"), unsafe_allow_html=True)
+    with k5:
+        e_color = C_GRAY if pd.isna(execucao) else (C_GREEN if execucao <= 100 else C_RED)
+        st.markdown(_kpi_card("🎯 % Execução", _fmt_pct(execucao), e_color,
+                              "Realizado / Orçado"), unsafe_allow_html=True)
 
-    st.markdown("<div style='margin-top:1rem'></div>", unsafe_allow_html=True)
+    st.markdown("<div style='margin-top:1.2rem'></div>", unsafe_allow_html=True)
 
-    # ── Gráfico: Total por Setor ──────────────────────────────────────────────
-    st.markdown('<div class="orc-header">📊 Orçamento Total por Setor</div>', unsafe_allow_html=True)
+    # ─── Agregações ───────────────────────────────────────────────────────────
+    df_monthly = _build_monthly(df_f)
+    df_area    = _build_area(df_f)
 
-    df_cat = df_f.groupby("Categoria")["Total_Anual"].sum().sort_values(ascending=True).reset_index()
-    cores  = [C_ORANGE if v == df_cat["Total_Anual"].max() else C_BLUE for v in df_cat["Total_Anual"]]
+    # ─── Gráficos — linha 1 ───────────────────────────────────────────────────
+    g1, g2 = st.columns(2)
+    with g1:
+        st.markdown('<div class="chart-box">', unsafe_allow_html=True)
+        st.plotly_chart(_chart_orc_real_mensal(df_monthly), use_container_width=True, config=_CFG)
+        st.markdown("</div>", unsafe_allow_html=True)
+    with g2:
+        st.markdown('<div class="chart-box">', unsafe_allow_html=True)
+        st.plotly_chart(_chart_orc_real_area(df_area), use_container_width=True, config=_CFG)
+        st.markdown("</div>", unsafe_allow_html=True)
 
-    fig_bar = go.Figure(go.Bar(
-        x=df_cat["Total_Anual"], y=df_cat["Categoria"], orientation="h",
-        marker_color=cores,
-        text=[f"R$ {v:,.0f}".replace(",",".") for v in df_cat["Total_Anual"]],
-        textposition="outside",
-        textfont=dict(size=10, color="#374151", weight="bold"),
-        hovertemplate="%{y}: R$ %{x:,.2f}<extra></extra>",
-    ))
-    fig_bar.update_layout(
-        paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
-        font=dict(family="Inter, sans-serif", color="#374151"),
-        xaxis=dict(gridcolor="#F0F0F0", tickprefix="R$ "),
-        yaxis=dict(gridcolor="rgba(0,0,0,0)", automargin=True),
-        margin=dict(l=10, r=120, t=20, b=20),
-        height=max(300, len(df_cat)*52+80),
-        showlegend=False,
+    # ─── Gráficos — linha 2 ───────────────────────────────────────────────────
+    g3, g4 = st.columns(2)
+    with g3:
+        st.markdown('<div class="chart-box">', unsafe_allow_html=True)
+        st.plotly_chart(_chart_desvio_area(df_area), use_container_width=True, config=_CFG)
+        st.markdown("</div>", unsafe_allow_html=True)
+    with g4:
+        st.markdown('<div class="chart-box">', unsafe_allow_html=True)
+        st.plotly_chart(_chart_evolucao_mensal(df_monthly), use_container_width=True, config=_CFG)
+        st.markdown("</div>", unsafe_allow_html=True)
+
+    # ─── Tabela detalhada ─────────────────────────────────────────────────────
+    st.markdown("<div style='margin-top:0.4rem'></div>", unsafe_allow_html=True)
+    st.markdown('<div class="sec-header">📋 Registros Detalhados</div>', unsafe_allow_html=True)
+
+    df_show = df_f.copy()
+    df_show["Valor (R$)"] = df_show["Valor"].apply(_fmt_brl)
+    df_show = df_show.rename(columns={"MêsNome": "Mês"})
+    df_show["Data"] = df_show["Data"].apply(
+        lambda x: x.strftime("%d/%m/%Y") if pd.notna(x) else ""
     )
-    st.plotly_chart(fig_bar, use_container_width=True, config={"displayModeBar": False})
 
-    # ── Gráfico: Evolução Mensal ──────────────────────────────────────────────
-    st.markdown('<div class="orc-header">📈 Distribuição Mensal do Orçamento</div>', unsafe_allow_html=True)
+    show_cols = [c for c in [
+        "Data", "Ano", "Mês", "Área", "Categoria",
+        "Empresa", "Tipo_Valor", "Valor (R$)", "Justificativa_ROI",
+    ] if c in df_show.columns]
 
-    cores_linha = [C_BLUE, C_ORANGE, "#10B981", "#8B5CF6", "#F59E0B",
-                   "#EF4444", "#6366F1", "#EC4899", "#14B8A6", "#F97316"]
+    st.dataframe(df_show[show_cols], use_container_width=True, hide_index=True)
 
-    fig_evo = go.Figure()
-    for i, cat in enumerate(cats_sel or categorias):
-        df_c = df_f[df_f["Categoria"] == cat]
-        ys   = [df_c[m].sum() for m in MESES_ABBR]
-        fig_evo.add_trace(go.Scatter(
-            x=MESES_ABBR, y=ys, name=cat,
-            mode="lines+markers",
-            line=dict(color=cores_linha[i % len(cores_linha)], width=2),
-            marker=dict(size=7),
-            hovertemplate=f"{cat}: R$ %{{y:,.2f}}<extra></extra>",
-            stackgroup=None,
-        ))
-    fig_evo.update_layout(
-        paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
-        font=dict(family="Inter, sans-serif", color="#374151"),
-        xaxis=dict(gridcolor="#F0F0F0"),
-        yaxis=dict(gridcolor="#F0F0F0", tickprefix="R$ "),
-        legend=dict(orientation="h", y=-0.2, x=0.5, xanchor="center", bgcolor="rgba(0,0,0,0)"),
-        margin=dict(l=10, r=10, t=20, b=80),
-        height=400, hovermode="x unified",
-    )
-    st.plotly_chart(fig_evo, use_container_width=True, config={"displayModeBar": False})
-
-    # ── Tabela Detalhada ──────────────────────────────────────────────────────
-    st.markdown('<div class="orc-header">📋 Detalhamento por Item</div>', unsafe_allow_html=True)
-
-    cat_detail = st.selectbox("Selecione o Setor para detalhar",
-                               ["Todos"] + (cats_sel or categorias), key="orc_detail")
-    df_det = df_f if cat_detail == "Todos" else df_f[df_f["Categoria"] == cat_detail]
-
-    # Define colunas a mostrar
-    if view_mes == "Anual":
-        cols_show = ["Categoria","Item","Empresa","Total_Anual"] + MESES_ABBR
-    else:
-        cols_show = ["Categoria","Item","Empresa", view_mes]
-
-    df_show = df_det[cols_show].copy()
-
-    # Formata valores monetários
-    def _fmt(v):
-        if isinstance(v, float) and v > 0:
-            return f"R$ {v:,.2f}".replace(",","X").replace(".",",").replace("X",".")
-        return "—" if v == 0.0 else v
-
-    for col in MESES_ABBR + ["Total_Anual"]:
-        if col in df_show.columns:
-            df_show[col] = df_show[col].apply(_fmt)
-
-    df_show.rename(columns={"Total_Anual":"Total Anual"}, inplace=True)
-
-    # Destaque por setor
-    def _row_color(row):
-        styles = [""] * len(row)
-        return styles
-
-    st.dataframe(df_show, use_container_width=True, hide_index=True,
-                 height=min(600, len(df_show)*38+60))
-
-    # ── Justificativas ───────────────────────────────────────────────────────
-    df_just = df_det[df_det["Justificativa"].str.strip() != ""][["Categoria","Item","Justificativa","Total_Anual"]]
-    if not df_just.empty:
-        with st.expander("📖 Ver Justificativas / ROI dos itens", expanded=False):
-            for _, r in df_just.iterrows():
-                total_fmt = f"R$ {r['Total_Anual']:,.2f}".replace(",","X").replace(".",",").replace("X",".")
-                st.markdown(f"""
-                <div style="background:#F8FAFF;border-left:4px solid {C_BLUE};
-                            border-radius:8px;padding:0.7rem 1rem;margin-bottom:0.5rem">
-                    <div style="font-size:0.75rem;color:{C_ORANGE};font-weight:700">{r['Categoria']} — {r['Item']}</div>
-                    <div style="font-size:0.85rem;color:#374151;margin-top:2px">{r['Justificativa']}</div>
-                    <div style="font-size:0.72rem;color:{C_BLUE};margin-top:4px;font-weight:700">{total_fmt}</div>
-                </div>""", unsafe_allow_html=True)
-
-    # ── Pizza: composição por setor ───────────────────────────────────────────
-    st.markdown('<div class="orc-header">🥧 Composição do Orçamento por Setor</div>', unsafe_allow_html=True)
-    df_pie = df_f.groupby("Categoria")["Total_Anual"].sum().reset_index()
-    df_pie = df_pie[df_pie["Total_Anual"] > 0]
-    fig_pie = go.Figure(go.Pie(
-        labels=df_pie["Categoria"],
-        values=df_pie["Total_Anual"],
-        hole=0.45,
-        marker=dict(colors=cores_linha[:len(df_pie)]),
-        textinfo="label+percent",
-        hovertemplate="%{label}: R$ %{value:,.2f}<extra></extra>",
-    ))
-    fig_pie.update_layout(
-        paper_bgcolor="rgba(0,0,0,0)",
-        font=dict(family="Inter, sans-serif"),
-        legend=dict(orientation="h", y=-0.15, x=0.5, xanchor="center"),
-        margin=dict(l=10, r=10, t=20, b=60),
-        height=420,
-    )
-    st.plotly_chart(fig_pie, use_container_width=True, config={"displayModeBar": False})
+    st.markdown("<div style='margin-top:0.5rem'></div>", unsafe_allow_html=True)
+    if st.button("🔄 Atualizar Base de Orçamento", key="orc_refresh"):
+        st.cache_data.clear()
+        st.rerun()
