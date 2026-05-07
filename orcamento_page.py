@@ -31,16 +31,16 @@ _CFG = {"displayModeBar": False}
 _L = dict(
     paper_bgcolor="rgba(0,0,0,0)",
     plot_bgcolor="rgba(0,0,0,0)",
-    font=dict(family="Inter, Segoe UI, sans-serif", color="#374151", size=12),
-    margin=dict(l=10, r=10, t=44, b=10),
-    hoverlabel=dict(bgcolor="#FFFFFF", bordercolor="#E5E7EB", font_size=12),
+    font=dict(family="Inter, Segoe UI, sans-serif", color="#374151", size=14),
+    margin=dict(l=10, r=10, t=54, b=10),
+    hoverlabel=dict(bgcolor="#FFFFFF", bordercolor="#E5E7EB", font_size=13),
     legend=dict(orientation="h", yanchor="bottom", y=1.02,
                 xanchor="right", x=1, bgcolor="rgba(0,0,0,0)"),
 )
 
 
 def _title(text: str) -> dict:
-    return dict(text=text, font=dict(size=13, color=C_BLUE, weight="bold"), x=0.01)
+    return dict(text=text, font=dict(size=18, color=C_BLUE, weight="bold"), x=0.01)
 
 
 # ─── Limpeza de valor em formato brasileiro ───────────────────────────────────
@@ -157,21 +157,21 @@ def _chart_orc_real_mensal(df_m: pd.DataFrame) -> go.Figure:
         name="Orçado", x=df_m["Label"], y=df_m["Orçado"],
         marker_color=C_BLUE, opacity=0.85,
         text=[_fmt_brl(v) for v in df_m["Orçado"]],
-        textposition="outside", textfont=dict(size=8, color=C_BLUE),
+        textposition="outside", textfont=dict(size=14, color=C_BLUE),
         hovertemplate="%{x}<br>Orçado: %{text}<extra></extra>",
     ))
     fig.add_trace(go.Bar(
         name="Realizado", x=df_m["Label"], y=df_m["Realizado"],
         marker_color=C_ORANGE, opacity=0.9,
         text=[_fmt_brl(v) for v in df_m["Realizado"]],
-        textposition="outside", textfont=dict(size=8, color=C_ORANGE),
+        textposition="outside", textfont=dict(size=14, color=C_ORANGE),
         hovertemplate="%{x}<br>Realizado: %{text}<extra></extra>",
     ))
     fig.update_layout(
         **_L, title=_title("Orçado × Realizado por Mês"),
         barmode="group", bargap=0.22, bargroupgap=0.05,
-        xaxis=dict(gridcolor="#F0F0F0"),
-        yaxis=dict(gridcolor="#F0F0F0"),
+        xaxis=dict(gridcolor="#F0F0F0", tickfont=dict(size=13)),
+        yaxis=dict(gridcolor="#F0F0F0", tickfont=dict(size=13)),
     )
     return fig
 
@@ -184,43 +184,48 @@ def _chart_orc_real_area(df_a: pd.DataFrame) -> go.Figure:
         name="Orçado", x=df_a["Área"], y=df_a["Orçado"],
         marker_color=C_BLUE, opacity=0.85,
         text=[_fmt_brl(v) for v in df_a["Orçado"]],
-        textposition="outside", textfont=dict(size=8, color=C_BLUE),
+        textposition="outside", textfont=dict(size=14, color=C_BLUE),
         hovertemplate="%{x}<br>Orçado: %{text}<extra></extra>",
     ))
     fig.add_trace(go.Bar(
         name="Realizado", x=df_a["Área"], y=df_a["Realizado"],
         marker_color=C_ORANGE, opacity=0.9,
         text=[_fmt_brl(v) for v in df_a["Realizado"]],
-        textposition="outside", textfont=dict(size=8, color=C_ORANGE),
+        textposition="outside", textfont=dict(size=14, color=C_ORANGE),
         hovertemplate="%{x}<br>Realizado: %{text}<extra></extra>",
     ))
     fig.update_layout(
         **_L, title=_title("Orçado × Realizado por Área"),
         barmode="group", bargap=0.22, bargroupgap=0.05,
-        xaxis=dict(gridcolor="#F0F0F0", tickangle=tick_angle),
-        yaxis=dict(gridcolor="#F0F0F0"),
+        xaxis=dict(gridcolor="#F0F0F0", tickangle=tick_angle, tickfont=dict(size=13)),
+        yaxis=dict(gridcolor="#F0F0F0", tickfont=dict(size=13)),
     )
     return fig
 
 
 def _chart_desvio_area(df_a: pd.DataFrame) -> go.Figure:
     """Barras horizontais de desvio (Realizado − Orçado) por área."""
-    df_s = df_a.sort_values("Desvio").reset_index(drop=True)
+    df_s = df_a.sort_values("Desvio", ascending=False).reset_index(drop=True)
     colors = [C_GREEN if v <= 0 else C_RED for v in df_s["Desvio"]]
     fig = go.Figure(go.Bar(
         x=df_s["Desvio"], y=df_s["Área"], orientation="h",
         marker_color=colors,
         text=[_fmt_brl(v) for v in df_s["Desvio"]],
         textposition="outside",
-        textfont=dict(size=10, color="#374151", weight="bold"),
+        textfont=dict(size=14, color="#374151", weight="bold"),
         hovertemplate="%{y}<br>Desvio: %{text}<extra></extra>",
     ))
     fig.add_vline(x=0, line_color="#374151", line_width=1)
     fig.update_layout(
         **_L, title=_title("Desvio por Área (Realizado − Orçado)"),
         showlegend=False,
-        xaxis=dict(gridcolor="#F0F0F0"),
-        yaxis=dict(gridcolor="rgba(0,0,0,0)", automargin=True),
+        xaxis=dict(gridcolor="#F0F0F0", tickfont=dict(size=13)),
+        yaxis=dict(
+            gridcolor="rgba(0,0,0,0)", automargin=True,
+            tickfont=dict(size=13),
+            categoryorder="array",
+            categoryarray=df_s["Área"].tolist()[::-1],
+        ),
         height=max(280, len(df_s) * 54 + 90),
     )
     return fig
@@ -245,13 +250,13 @@ def _chart_evolucao_mensal(df_m: pd.DataFrame) -> go.Figure:
         fill="tonexty", fillcolor="rgba(244,121,32,0.10)",
         text=[_fmt_brl(v) if v > 0 else "" for v in df_m["Realizado"]],
         textposition="top center",
-        textfont=dict(size=9, color=C_ORANGE, weight="bold"),
+        textfont=dict(size=14, color=C_ORANGE, weight="bold"),
         hovertemplate="%{x}<br>Realizado: %{text}<extra></extra>",
     ))
     fig.update_layout(
         **_L, title=_title("Evolução Mensal do Orçamento"),
-        xaxis=dict(gridcolor="#F0F0F0"),
-        yaxis=dict(gridcolor="#F0F0F0"),
+        xaxis=dict(gridcolor="#F0F0F0", tickfont=dict(size=13)),
+        yaxis=dict(gridcolor="#F0F0F0", tickfont=dict(size=13)),
         hovermode="x unified",
     )
     return fig
@@ -475,10 +480,11 @@ def page_orcamento():
 
     df_show = df_f.copy()
     df_show["Valor (R$)"] = df_show["Valor"].apply(_fmt_brl)
-    df_show = df_show.rename(columns={"MêsNome": "Mês"})
     df_show["Data"] = df_show["Data"].apply(
         lambda x: x.strftime("%d/%m/%Y") if pd.notna(x) else ""
     )
+    # Remove coluna numérica "Mês" antes de renomear "MêsNome" para evitar duplicata
+    df_show = df_show.drop(columns=["Mês"], errors="ignore").rename(columns={"MêsNome": "Mês"})
 
     show_cols = [c for c in [
         "Data", "Ano", "Mês", "Área", "Categoria",
