@@ -15,6 +15,7 @@ from plotly.subplots import make_subplots
 import utils
 from sge_page import page_diagnostico_sge
 from orcamento_page import page_orcamento
+from instagram_page import page_instagram
 
 # ─── Configuração da Página ───────────────────────────────────────────────────
 
@@ -1199,7 +1200,7 @@ def main():
         )
         st.markdown("<div style='margin-top:0.8rem'></div>", unsafe_allow_html=True)
 
-    tab_geral, tab_depto, tab_sge, tab_orc = st.tabs(["📊  Visão Geral", "🏢  Por Departamento", "🔍  Diagnóstico SGE", "💰  Orçamento"])
+    tab_geral, tab_depto, tab_sge, tab_orc, tab_insta = st.tabs(["📊  Visão Geral", "🏢  Por Departamento", "🔍  Diagnóstico SGE", "💰  Orçamento", "📱  Instagram"])
     with tab_geral:
         page_visao_geral(df_f)
     with tab_depto:
@@ -1208,6 +1209,8 @@ def main():
         page_diagnostico_sge()
     with tab_orc:
         page_orcamento()
+    with tab_insta:
+        page_instagram()
 
 
 if __name__ == "__main__":
