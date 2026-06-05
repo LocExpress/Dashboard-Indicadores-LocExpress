@@ -94,6 +94,29 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 .ins-body { font-size: 11px; color: var(--muted); line-height: 1.6; }
 .ins-body strong { color: var(--text); }
 
+/* ─── Metas de Marketing ─── */
+.metas-section { margin-top: 28px; }
+.section-header { display: flex; align-items: center; gap: 10px; margin-bottom: 16px; padding-bottom: 12px; border-bottom: 1px solid var(--border); flex-wrap: wrap; }
+.section-title { font-size: 14px; font-weight: 700; letter-spacing: .3px; }
+.section-tag { background: rgba(255,107,0,0.12); color: var(--orange); border: 1px solid rgba(255,107,0,0.28); border-radius: 20px; padding: 3px 12px; font-size: 11px; font-weight: 600; }
+.meta-kpi-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 18px; }
+.meta-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 16px 18px; position: relative; overflow: hidden; }
+.meta-card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px; }
+.meta-card.ok::before  { background: var(--green); }
+.meta-card.warn::before { background: #fbbf24; }
+.meta-card.fail::before { background: var(--red); }
+.meta-label { font-size: 10px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .7px; margin-bottom: 8px; }
+.meta-real { font-size: 22px; font-weight: 800; line-height: 1; margin-bottom: 4px; }
+.meta-real.ok   { color: var(--green); }
+.meta-real.warn { color: #fbbf24; }
+.meta-real.fail { color: var(--red); }
+.meta-sub { font-size: 11px; color: var(--muted); }
+.meta-pill { display: inline-block; border-radius: 20px; padding: 2px 9px; font-size: 11px; font-weight: 700; margin-top: 6px; }
+.meta-pill.ok   { background: rgba(52,211,153,.14);  color: var(--green); }
+.meta-pill.warn { background: rgba(251,191,36,.14);   color: #fbbf24; }
+.meta-pill.fail { background: rgba(248,113,113,.14);  color: var(--red); }
+.meta-charts-row { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+
 /* ─── Footer ─── */
 .footer { text-align: center; padding: 16px; font-size: 11px; color: var(--muted); border-top: 1px solid var(--border); margin-top: 8px; }
 
@@ -108,10 +131,13 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
   .header, .filter-wrap { padding: 14px 16px; }
   .filter-wrap { gap: 12px; }
   .view-toggle { margin-left: 0; }
+  .meta-kpi-grid { grid-template-columns: 1fr 1fr; }
+  .meta-charts-row { grid-template-columns: 1fr; }
 }
 @media (max-width: 600px) {
   .kpi-grid { grid-template-columns: 1fr 1fr; }
   .insights-grid { grid-template-columns: 1fr; }
+  .meta-kpi-grid { grid-template-columns: 1fr; }
 }
 </style>
 </head>
@@ -245,6 +271,30 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; b
 
   <!-- Insights -->
   <div class="insights-grid" id="insightsGrid"></div>
+
+  <!-- Metas de Marketing -->
+  <div class="metas-section">
+    <div class="section-header">
+      <span class="section-title">📋 Metas de Marketing — Instagram</span>
+      <span class="section-tag">Planilha de Indicadores · Setor Marketing</span>
+      <span style="font-size:11px;color:var(--muted);margin-left:auto">Jan – Abr/2026 · último mês disponível: Abr/2026</span>
+    </div>
+
+    <div class="meta-kpi-grid" id="metaKpiGrid"></div>
+
+    <div class="meta-charts-row">
+      <div class="card">
+        <div class="card-title">Seguidores · Meta vs. Realizado</div>
+        <div class="card-sub">Número total de seguidores ao fim de cada mês</div>
+        <div class="chart-box" style="height:220px"><canvas id="metaSegChart"></canvas></div>
+      </div>
+      <div class="card">
+        <div class="card-title">Curtidas mensais · Meta vs. Realizado</div>
+        <div class="card-sub">Total de curtidas acumuladas no mês</div>
+        <div class="chart-box" style="height:220px"><canvas id="metaCurtChart"></canvas></div>
+      </div>
+    </div>
+  </div>
 
 </main>
 
@@ -740,11 +790,101 @@ function renderPosts() {
   });
 }
 
+// ─── Metas de Marketing (Planilha de Indicadores — Setor Marketing) ───
+const METAS_MKT = {
+  seguidores: [
+    {mes:'Jan/26', meta:6000,  real:6030},
+    {mes:'Fev/26', meta:6200,  real:6300},
+    {mes:'Mar/26', meta:6500,  real:6700},
+    {mes:'Abr/26', meta:6900,  real:6955},
+  ],
+  curtidas: [
+    {mes:'Jan/26', meta:1100,  real:1112},
+    {mes:'Fev/26', meta:1100,  real:1310},
+    {mes:'Mar/26', meta:1100,  real:1789},
+    {mes:'Abr/26', meta:1100,  real:1515},
+  ],
+  campanhas: {meta:1,  real:3,  label:'Campanhas lançadas · Abr/26'},
+  aderencia: {meta:82, real:62, label:'Aderência ao SGE (%) · Abr/26'},
+};
+
+function _metaStatus(real, meta) {
+  if(!meta) return 'warn';
+  const pct = real / meta * 100;
+  return pct >= 100 ? 'ok' : pct >= 80 ? 'warn' : 'fail';
+}
+function _metaPill(real, meta) {
+  if(!meta) return '— sem meta';
+  const pct = real / meta * 100;
+  const icon = pct >= 100 ? '✅' : pct >= 80 ? '⚠️' : '❌';
+  return `${icon} ${pct.toFixed(1)}% da meta`;
+}
+
+function renderMetas() {
+  const segLast  = METAS_MKT.seguidores[METAS_MKT.seguidores.length-1];
+  const curtLast = METAS_MKT.curtidas[METAS_MKT.curtidas.length-1];
+
+  const cards = [
+    {label:'Seguidores · Abr/26',         real:segLast.real,           meta:segLast.meta,           display: v=>fmt(v)},
+    {label:'Curtidas mensais · Abr/26',   real:curtLast.real,          meta:curtLast.meta,          display: v=>fmt(v)},
+    {label:METAS_MKT.campanhas.label,     real:METAS_MKT.campanhas.real, meta:METAS_MKT.campanhas.meta, display: v=>`${v} campanha${v!==1?'s':''}`},
+    {label:METAS_MKT.aderencia.label,     real:METAS_MKT.aderencia.real, meta:METAS_MKT.aderencia.meta, display: v=>`${v}%`},
+  ];
+
+  const grid = document.getElementById('metaKpiGrid');
+  grid.innerHTML = '';
+  cards.forEach(c => {
+    const st   = _metaStatus(c.real, c.meta);
+    const pill = _metaPill(c.real, c.meta);
+    grid.innerHTML += `
+      <div class="meta-card ${st}">
+        <div class="meta-label">${c.label}</div>
+        <div class="meta-real ${st}">${c.display(c.real)}</div>
+        <div class="meta-sub">Meta: <strong style="color:var(--text)">${c.display(c.meta)}</strong></div>
+        <div class="meta-pill ${st}">${pill}</div>
+      </div>`;
+  });
+
+  const barOpts = (yFmt) => ({
+    responsive: true, maintainAspectRatio: false,
+    plugins: { legend: { labels: { color:'#7878a0', font:{size:11}, boxWidth:14 } } },
+    scales: {
+      x: { ticks:{color:'#7878a0',font:{size:11}}, grid:{color:'rgba(255,255,255,0.04)'} },
+      y: { ticks:{color:'#7878a0',font:{size:10}, callback: yFmt}, grid:{color:'rgba(255,255,255,0.04)'} },
+    },
+  });
+
+  new Chart(document.getElementById('metaSegChart'), {
+    type: 'bar',
+    data: {
+      labels: METAS_MKT.seguidores.map(d=>d.mes),
+      datasets: [
+        {label:'Meta',      data:METAS_MKT.seguidores.map(d=>d.meta), backgroundColor:'rgba(120,120,160,0.3)', borderColor:'rgba(120,120,160,0.6)', borderWidth:1, borderRadius:5},
+        {label:'Realizado', data:METAS_MKT.seguidores.map(d=>d.real), backgroundColor:'rgba(52,211,153,0.55)',  borderColor:'rgba(52,211,153,0.9)',  borderWidth:1, borderRadius:5},
+      ],
+    },
+    options: barOpts(v => fmt(v)),
+  });
+
+  new Chart(document.getElementById('metaCurtChart'), {
+    type: 'bar',
+    data: {
+      labels: METAS_MKT.curtidas.map(d=>d.mes),
+      datasets: [
+        {label:'Meta',      data:METAS_MKT.curtidas.map(d=>d.meta), backgroundColor:'rgba(120,120,160,0.3)', borderColor:'rgba(120,120,160,0.6)', borderWidth:1, borderRadius:5},
+        {label:'Realizado', data:METAS_MKT.curtidas.map(d=>d.real), backgroundColor:'rgba(255,107,0,0.55)',  borderColor:'rgba(255,107,0,0.9)',  borderWidth:1, borderRadius:5},
+      ],
+    },
+    options: barOpts(v => fmt(v)),
+  });
+}
+
 // ─── Init ───
 buildSelects();
 initCharts();
 renderPosts();
 applyFilter();
+renderMetas();
 </script>
 </body>
 </html>
