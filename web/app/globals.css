@@ -1,0 +1,148 @@
+@import "tailwindcss";
+
+/* ─── Tokens LocExpress ─── */
+:root {
+  --lx-bg: #f0f2f6;
+  --lx-indigo-dark: #0f0f5e;
+  --lx-indigo: #2d3192;
+  --lx-indigo-light: #3f3fbf;
+  --lx-orange: #f47920;
+  --lx-blue-dark: #003087;
+  --lx-gray-dark: #374151;
+  --lx-gray-mid: #6b7280;
+  --lx-green: #00c853;
+  --lx-yellow: #ffb300;
+  --lx-red: #f44336;
+}
+
+html, body {
+  font-family: var(--font-inter), "Inter", "Segoe UI", sans-serif;
+  background: var(--lx-bg);
+  color: var(--lx-gray-dark);
+}
+
+.lx-container { max-width: 1500px; margin: 0 auto; padding: 1.2rem 1.5rem 3rem; }
+
+/* ─── Header ─── */
+.lx-header {
+  background: linear-gradient(135deg, #0f0f5e 0%, #2d3192 45%, #f47920 100%);
+  border-radius: 16px;
+  margin-bottom: 1.4rem;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.22);
+  overflow: hidden;
+}
+.lx-header-top { background: #f47920; padding: 0.5rem 2rem; display: flex; align-items: center; gap: 0.8rem; }
+.lx-logo-text { font-size: 1.4rem; font-weight: 900; color: #fff; letter-spacing: -0.02em; }
+.lx-logo-text span { color: #1a1a6e; }
+.lx-tagline { font-size: 0.75rem; font-weight: 700; color: #fff; letter-spacing: 0.1em; opacity: 0.9; }
+.lx-header-body { padding: 1.2rem 2rem 1.4rem; }
+.lx-header-body h1 { color: #fff; font-size: 1.6rem; font-weight: 900; margin: 0; letter-spacing: -0.02em; }
+.lx-header-body p { color: #aabfff; font-size: 0.88rem; margin: 0.3rem 0 0; }
+
+/* ─── Layout grid (sidebar + main) ─── */
+.lx-shell { display: grid; grid-template-columns: 260px 1fr; gap: 1.2rem; align-items: start; }
+@media (max-width: 900px) { .lx-shell { grid-template-columns: 1fr; } }
+
+.lx-sidebar {
+  background: linear-gradient(180deg, #0f0f5e 0%, #2d3192 50%, #3f3fbf 100%);
+  border-radius: 16px; padding: 1.2rem 1rem; position: sticky; top: 1rem;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+}
+.lx-sidebar-title { font-size: 0.72rem; font-weight: 700; letter-spacing: 0.07em; text-transform: uppercase; color: #aabfff; margin-bottom: 0.5rem; }
+.lx-filter-label { font-size: 0.7rem; font-weight: 700; letter-spacing: 0.07em; text-transform: uppercase; color: #aabfff; margin: 0.8rem 0 0.3rem; }
+
+/* multiselect chips no sidebar */
+.lx-chips { display: flex; flex-wrap: wrap; gap: 4px; }
+.lx-chip {
+  background: rgba(255, 255, 255, 0.18); border: 1px solid rgba(255, 255, 255, 0.28);
+  border-radius: 6px; color: #e8eaff; font-size: 0.7rem; padding: 2px 7px; cursor: pointer; user-select: none;
+}
+.lx-chip.off { background: rgba(255, 255, 255, 0.04); color: rgba(255, 255, 255, 0.4); border-color: rgba(255, 255, 255, 0.1); }
+.lx-chip:hover { border-color: var(--lx-orange); }
+.lx-chip-actions { display: flex; gap: 6px; margin-top: 4px; }
+.lx-chip-action { font-size: 0.62rem; color: #aabfff; cursor: pointer; text-decoration: underline; }
+
+/* chips no corpo (fundo claro) */
+.lx-chips-b { display: flex; flex-wrap: wrap; gap: 5px; }
+.lx-chip-b { background: #2d3192; color: #fff; border: 1px solid #2d3192; border-radius: 6px; font-size: 0.72rem; padding: 3px 9px; cursor: pointer; user-select: none; }
+.lx-chip-b.off { background: #eef0f4; color: #9ca3af; border-color: #e0e3ea; }
+.lx-chip-b:hover { border-color: var(--lx-orange); }
+.lx-chip-action-b { font-size: 0.62rem; color: #2d3192; cursor: pointer; text-decoration: underline; }
+
+/* ─── KPI Cards ─── */
+.kpi-card {
+  background: #fff; border-radius: 14px; padding: 1.1rem 1.3rem;
+  box-shadow: 0 2px 16px rgba(0, 0, 0, 0.07); border-left: 5px solid; min-height: 120px;
+  transition: transform 0.18s, box-shadow 0.18s;
+}
+.kpi-card:hover { transform: translateY(-3px); box-shadow: 0 6px 24px rgba(0, 0, 0, 0.12); }
+.kpi-label { font-size: 0.68rem; font-weight: 700; letter-spacing: 0.09em; text-transform: uppercase; color: #6b7280; margin-bottom: 0.3rem; }
+.kpi-value { font-size: 1.75rem; font-weight: 900; line-height: 1.1; margin-bottom: 0.2rem; }
+.kpi-status { font-size: 0.72rem; font-weight: 600; }
+.kpi-unit { font-size: 0.65rem; color: #9ca3af; margin-top: 0.2rem; }
+
+/* ─── Summary cards ─── */
+.summary-card {
+  background: #fff; border-radius: 14px; padding: 1rem 1.2rem; box-shadow: 0 2px 14px rgba(0, 0, 0, 0.07);
+  text-align: center; border-top: 4px solid; min-height: 130px;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+}
+.summary-card .s-num { font-size: 2.4rem; font-weight: 900; line-height: 1; }
+.summary-card .s-label { font-size: 0.75rem; font-weight: 600; color: #6b7280; text-transform: uppercase; letter-spacing: 0.06em; margin-top: 0.3rem; }
+
+/* ─── Section headers ─── */
+.sec-header { font-size: 0.95rem; font-weight: 700; color: #2d3192; padding: 0.35rem 0; border-bottom: 2.5px solid #f47920; margin: 1rem 0 0.75rem; }
+
+/* ─── Chart box ─── */
+.chart-box { background: #fff; border-radius: 14px; padding: 0.6rem; box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06); margin-bottom: 0.6rem; }
+
+/* ─── Unit pill ─── */
+.unit-pill { display: inline-block; border-radius: 12px; padding: 0.1rem 0.6rem; font-size: 0.7rem; font-weight: 700; letter-spacing: 0.04em; }
+
+/* ─── Info box ─── */
+.info-box { background: #eef2ff; border-left: 4px solid #2d3192; border-radius: 8px; padding: 0.8rem 1rem; color: #2d3192; font-size: 0.85rem; }
+
+/* ─── Tabs ─── */
+.lx-tabs { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 1rem; }
+.lx-tab {
+  border-radius: 8px 8px 0 0; background: #e5e7eb; color: #374151; font-weight: 600;
+  padding: 0.5rem 1.3rem; cursor: pointer; border: none; font-size: 0.9rem;
+}
+.lx-tab.active { background: #2d3192; color: #fff; }
+
+/* ─── Buttons ─── */
+.lx-btn {
+  background: linear-gradient(135deg, #2d3192 0%, #f47920 100%); color: #fff; border: none;
+  border-radius: 8px; font-weight: 700; padding: 0.5rem 1rem; cursor: pointer; letter-spacing: 0.02em; width: 100%;
+}
+.lx-btn:hover { opacity: 0.88; }
+
+/* ─── Selects no corpo ─── */
+.lx-select { width: 100%; padding: 0.45rem 0.6rem; border: 1.5px solid #d1d5db; border-radius: 8px; background: #fff; color: #2d3192; font-weight: 600; font-size: 0.85rem; }
+.lx-select-label { color: #2d3192; font-weight: 700; font-size: 0.85rem; margin-bottom: 0.25rem; display: block; }
+
+/* ─── SGE ─── */
+.sge-card { background: #fff; border-radius: 12px; padding: 1rem 1.2rem; box-shadow: 0 2px 12px rgba(0, 0, 0, 0.07); margin-bottom: 0.5rem; }
+.sge-header { font-size: 0.9rem; font-weight: 700; color: #2d3192; border-bottom: 2.5px solid #f47920; padding-bottom: 0.3rem; margin: 1rem 0 0.6rem; }
+.sge-regra { font-size: 0.72rem; color: #6b7280; font-style: italic; background: #f3f4f6; border-radius: 6px; padding: 0.25rem 0.6rem; display: inline-block; margin-bottom: 0.4rem; }
+
+/* ─── Data table ─── */
+.lx-table { width: 100%; border-collapse: collapse; font-size: 0.8rem; background: #fff; border-radius: 10px; overflow: hidden; }
+.lx-table th { background: #2d3192; color: #fff; font-weight: 700; padding: 0.5rem 0.7rem; text-align: left; font-size: 0.72rem; }
+.lx-table td { padding: 0.45rem 0.7rem; border-bottom: 1px solid #eef0f4; }
+.lx-table tr:hover td { background: #f9fafb; }
+
+.lx-grid { display: grid; gap: 0.9rem; }
+
+/* ─── Marketing ─── */
+.mkt-subtabs { display: flex; gap: 8px; margin-bottom: 1rem; flex-wrap: wrap; }
+.mkt-subtab { display: flex; align-items: center; gap: 6px; padding: 0.55rem 1.2rem; border-radius: 10px; border: 1.5px solid #d1d5db; background: #fff; color: #374151; font-weight: 700; cursor: pointer; font-size: 0.88rem; }
+.mkt-subtab.active { background: linear-gradient(135deg, #2d3192 0%, #f47920 100%); color: #fff; border-color: transparent; }
+.mkt-frame-wrap { background: #fff; border-radius: 14px; box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06); overflow: hidden; }
+.mkt-frame { width: 100%; border: none; display: block; }
+.mkt-placeholder { padding: 4rem 2rem; text-align: center; color: #6b7280; }
+.mkt-placeholder .icon { font-size: 3rem; }
+.mkt-placeholder h3 { color: #2d3192; font-size: 1.2rem; font-weight: 800; margin: 0.6rem 0 0.3rem; }
+
+.lx-spinner { text-align: center; padding: 4rem; color: #2d3192; font-weight: 600; }
+.lx-error { background: #fff5f5; border-left: 4px solid #f44336; border-radius: 8px; padding: 1rem 1.2rem; color: #991b1b; white-space: pre-wrap; }
