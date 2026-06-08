@@ -42,8 +42,19 @@ npm run dev   # http://localhost:3000
 
 1. Importe o repositório no Vercel.
 2. Em **Settings → General → Root Directory**, defina **`web`**.
-3. Framework: Next.js (detectado automaticamente). Sem variáveis de ambiente
-   necessárias — as planilhas são públicas (CSV).
-4. Deploy. (Ou via CLI: `cd web && vercel` para preview, `vercel --prod` para produção.)
+3. Framework: Next.js (detectado automaticamente).
+4. Variáveis de ambiente (Settings → Environment Variables, ambiente **Production**):
+   - `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` (`pk_live_…`) — **não** marcar como *Sensitive*.
+   - `CLERK_SECRET_KEY` (`sk_live_…`).
+   - `ALLOWED_EMAILS` — e-mails/domínios autorizados, separados por vírgula
+     (ex.: `fulano@empresa.com, grupoeven.com.br`). Vazio = libera qualquer login.
+5. Deploy. (Ou via CLI: `cd web && vercel` para preview, `vercel --prod` para produção.)
+
+## Autenticação (Clerk + allowlist no app)
+
+Login via **Google** com Clerk; o app só libera o dashboard para os e-mails em
+`ALLOWED_EMAILS` (checado em `app/page.tsx`). Quem não está na lista vê "Acesso não
+autorizado". Assim **não** é preciso o Modo Restrito / convites do Clerk — pode deixar
+o cadastro aberto no Clerk que o controle de acesso é feito por `ALLOWED_EMAILS`.
 
 > As URLs das planilhas estão em `lib/data.ts`, `lib/sge.ts` e `lib/orcamento.ts`.
