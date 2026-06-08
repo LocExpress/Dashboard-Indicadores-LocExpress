@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
+import { ClerkProvider, UserButton } from "@clerk/nextjs";
 import "./globals.css";
 
 const inter = Inter({
@@ -17,8 +18,15 @@ export default function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="pt-BR" className={inter.variable}>
-      <body>{children}</body>
-    </html>
+    <ClerkProvider signInUrl="/sign-in" signInFallbackRedirectUrl="/" afterSignOutUrl="/sign-in">
+      <html lang="pt-BR" className={inter.variable}>
+        <body>
+          <div style={{ position: "fixed", top: 14, right: 18, zIndex: 50 }}>
+            <UserButton />
+          </div>
+          {children}
+        </body>
+      </html>
+    </ClerkProvider>
   );
 }
