@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import { type OrcRow, buildMonthly, buildArea, ORC_COLORS } from "@/lib/orcamento";
 import { MESES_PT } from "@/lib/meses";
 import { fmtBrl, fmtPct } from "@/lib/format";
-import { MultiSelect, KpiCard, ChartBox, InfoBox, SecHeader, DataTable, type Column } from "../ui";
+import { MultiSelect, KpiCard, ChartBox, InfoBox, SecHeader, DataTable, Collapsible, type Column } from "../ui";
 import PlotlyChart from "../charts/PlotlyChart";
 import { chartOrcRealMensal, chartOrcRealArea, chartDesvioArea, chartEvolucaoMensalOrc } from "../charts/orcamento";
 
@@ -72,15 +72,17 @@ export default function OrcamentoPage({ data, error }: { data: OrcRow[] | null; 
     <div>
       <SecHeader>💰 Orçamento Setorial BI</SecHeader>
 
-      <div className="chart-box" style={{ padding: "1rem 1.2rem", marginBottom: "1rem" }}>
-        <div className="lx-grid" style={{ gridTemplateColumns: "repeat(3, 1fr)" }}>
-          <MultiSelect variant="body" label="Ano" options={opts.anos} selected={selAno} onChange={setSelAno} />
-          <MultiSelect variant="body" label="Mês" options={opts.meses} selected={selMes} onChange={setSelMes} formatLabel={(m) => MESES_PT[m] ?? String(m)} />
-          <MultiSelect variant="body" label="Área" options={opts.areas} selected={selArea} onChange={setSelArea} />
-          <MultiSelect variant="body" label="Categoria" options={opts.cats} selected={selCat} onChange={setSelCat} />
-          <MultiSelect variant="body" label="Empresa" options={opts.emps} selected={selEmp} onChange={setSelEmp} />
-          <MultiSelect variant="body" label="Tipo de Valor" options={opts.tipos} selected={selTipo} onChange={setSelTipo} />
-        </div>
+      <div className="chart-box" style={{ padding: "0.8rem 1.2rem", marginBottom: "1rem" }}>
+        <Collapsible title="🔍 Filtros do Orçamento" variant="body" defaultOpen={false}>
+          <div className="lx-grid" style={{ gridTemplateColumns: "repeat(3, 1fr)" }}>
+            <MultiSelect variant="body" label="Ano" options={opts.anos} selected={selAno} onChange={setSelAno} />
+            <MultiSelect variant="body" label="Mês" options={opts.meses} selected={selMes} onChange={setSelMes} formatLabel={(m) => MESES_PT[m] ?? String(m)} />
+            <MultiSelect variant="body" label="Área" options={opts.areas} selected={selArea} onChange={setSelArea} />
+            <MultiSelect variant="body" label="Categoria" options={opts.cats} selected={selCat} onChange={setSelCat} />
+            <MultiSelect variant="body" label="Empresa" options={opts.emps} selected={selEmp} onChange={setSelEmp} />
+            <MultiSelect variant="body" label="Tipo de Valor" options={opts.tipos} selected={selTipo} onChange={setSelTipo} />
+          </div>
+        </Collapsible>
       </div>
 
       {!allSet && <InfoBox>⚠️ Selecione ao menos uma opção em cada filtro.</InfoBox>}

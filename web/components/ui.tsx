@@ -1,9 +1,29 @@
 "use client";
-import React from "react";
+import React, { useState } from "react";
 import { getUnidadeConfig } from "@/lib/theme";
 
 export function ChartBox({ children, style }: { children: React.ReactNode; style?: React.CSSProperties }) {
   return <div className="chart-box" style={style}>{children}</div>;
+}
+
+export function Collapsible({
+  title, children, defaultOpen = false, variant = "body",
+}: {
+  title: React.ReactNode;
+  children: React.ReactNode;
+  defaultOpen?: boolean;
+  variant?: "sidebar" | "body";
+}) {
+  const [open, setOpen] = useState(defaultOpen);
+  return (
+    <div>
+      <button type="button" className={`lx-collapse-header ${variant}`} onClick={() => setOpen((o) => !o)} aria-expanded={open}>
+        <span>{title}</span>
+        <span className="lx-collapse-chevron">{open ? "▾" : "▸"}</span>
+      </button>
+      {open && <div className="lx-collapse-body">{children}</div>}
+    </div>
+  );
 }
 
 export function InfoBox({ children, style }: { children: React.ReactNode; style?: React.CSSProperties }) {

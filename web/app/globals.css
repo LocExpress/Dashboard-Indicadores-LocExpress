@@ -69,6 +69,17 @@ html, body {
 .lx-chip-b:hover { border-color: var(--lx-orange); }
 .lx-chip-action-b { font-size: 0.62rem; color: #2d3192; cursor: pointer; text-decoration: underline; }
 
+/* ─── Collapsible ─── */
+.lx-collapse-header {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  width: 100%; background: transparent; border: none; cursor: pointer; padding: 0.35rem 0; font-weight: 700;
+}
+.lx-collapse-header.sidebar { color: #aabfff; font-size: 0.72rem; letter-spacing: 0.07em; text-transform: uppercase; }
+.lx-collapse-header.body { color: #2d3192; font-size: 0.92rem; }
+.lx-collapse-header.body .lx-collapse-chevron { color: #f47920; }
+.lx-collapse-chevron { font-size: 0.7rem; opacity: 0.85; }
+.lx-collapse-body { padding-top: 0.5rem; }
+
 /* ─── KPI Cards ─── */
 .kpi-card {
   background: #fff; border-radius: 14px; padding: 1.1rem 1.3rem;

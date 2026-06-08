@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
 import Header from "./Header";
-import { MultiSelect } from "./ui";
+import { MultiSelect, Collapsible } from "./ui";
 import LogoSvg from "./LogoSvg";
 import { loadIndicadores } from "@/lib/data";
 import { loadSge, type SgeRow } from "@/lib/sge";
@@ -120,11 +120,12 @@ export default function Dashboard() {
         <div className="lx-shell">
           <aside className="lx-sidebar">
             <SidebarBrand />
-            <div className="lx-sidebar-title">🔍 Filtros</div>
-            <MultiSelect label="Ano" options={opts.anos} selected={selAno} onChange={setSelAno} />
-            <MultiSelect label="Mês" options={opts.meses} selected={selMes} onChange={setSelMes} formatLabel={(m) => MESES_PT[m] ?? String(m)} />
-            <MultiSelect label="Setor" options={opts.deptos} selected={selDep} onChange={setSelDep} />
-            <MultiSelect label="Indicador" options={opts.inds} selected={selInd} onChange={setSelInd} />
+            <Collapsible title="🔍 Filtros" variant="sidebar" defaultOpen={false}>
+              <MultiSelect label="Ano" options={opts.anos} selected={selAno} onChange={setSelAno} />
+              <MultiSelect label="Mês" options={opts.meses} selected={selMes} onChange={setSelMes} formatLabel={(m) => MESES_PT[m] ?? String(m)} />
+              <MultiSelect label="Setor" options={opts.deptos} selected={selDep} onChange={setSelDep} />
+              <MultiSelect label="Indicador" options={opts.inds} selected={selInd} onChange={setSelInd} />
+            </Collapsible>
             <div style={{ marginTop: "1rem" }}>
               <button className="lx-btn" onClick={loadAll}>🔄 Atualizar Dados</button>
             </div>
