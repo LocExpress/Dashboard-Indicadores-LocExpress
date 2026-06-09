@@ -107,7 +107,8 @@ function mesAno(dateVal) {
 function onOpen() {
   SpreadsheetApp.getUi()
     .createMenu('🤖 Agente SGE')
-    .addItem('Calcular pontuação do mês…', 'calcularMes')
+    .addItem('1) Contagem (Forms) — calcular mês…', 'calcularMes')
+    .addItem('2) Planilhas-mestre (IA) — avaliar mês…', 'calcularMesIA')
     .addToUi();
 }
 
@@ -171,4 +172,102 @@ function TIPO_MAP_VALORES() {
   const set = new Set();
   Object.keys(TIPO_MAP).forEach(k => set.add(norm(TIPO_MAP[k])));
   return set;
+}
+
+/* ════════════════════════════════════════════════════════════════════════
+ *  ETAPA 2 — Avaliação por IA (OpenAI) das PLANILHAS-MESTRE
+ *  Itens: Backup (piloto), depois Funcionograma, POP, Fluxograma.
+ *  Requer: Propriedades do script → OPENAI_API_KEY = sua chave nova.
+ * ════════════════════════════════════════════════════════════════════════ */
+
+const OPENAI_MODEL = 'gpt-4o-mini';
+
+// Fontes a avaliar. tabToSetor: nome da aba → setor(es) da BaseGeral.
+//   'IDENTIDADE' = o nome da aba já é o setor da BaseGeral.
+//   '' = ignora a aba.
+const FONTES_IA = [
+  {
+    assunto: 'PLANO DE DESENVOLVIMENTO DE BACKUP',
+    regra: 'Backup mapeado para 100% dos titulares E planilha atualizada nos últimos 90 dias = 5. ' +
+           'Parcial (faltam titulares) OU desatualizada (>90 dias) = 3. Sem dados = 0.',
+    planilhas: [
+      { id: '1kYvFxZuqf8YVhaKUtn6rfCqaz9un9untZodKfBvzxsM', tabToSetor: 'IDENTIDADE' }, // Backup LOC
+      { id: '1GSBF_VTg4LULG8FeOxMlWa4HLQf_9v5XiPs9I88l4ys',                              // Backup ESCAN
+        tabToSetor: { 'Operacional': '', 'Comercial': 'Comercial' } },                  // ⚠️ defina 'Operacional'
+    ],
+  },
+  // PRÓXIMOS (adicione no mesmo formato quando validarmos o piloto):
+  // { assunto:'FUNCIONOGRAMAS', regra:'...', planilhas:[ {id:'1f4JpXqRF...', tabToSetor:{...}}, {id:'1DfHUWL28...', tabToSetor:{...}} ] },
+  // { assunto:'POP´S',          regra:'...', planilhas:[ {id:'1Uwf897x...', tabToSetor:'IDENTIDADE'}, {id:'19HQC9oC...', tabToSetor:{...}} ] },
+  // { assunto:'FLUXOGRAMAS',    regra:'...', planilhas:[ {id:'1LPr_cgY...', tabToSetor:{...}} ] }, // LOC ainda não existe
+];
+
+function calcularMesIA() {
+  const ui = SpreadsheetApp.getUi();
+  const key = PropertiesService.getScriptProperties().getProperty('OPENAI_API_KEY');
+  if (!key) { ui.alert('Defina OPENAI_API_KEY em ⚙️ Configurações do projeto → Propriedades do script.'); return; }
+  const resp = ui.prompt('Agente SGE (IA)', 'Mês a avaliar (MM/AAAA), ex.: 04/2026:', ui.ButtonSet.OK_CANCEL);
+  if (resp.getSelectedButton() !== ui.Button.OK) return;
+  const m = resp.getResponseText().trim().match(/(\d{1,2})\/(\d{4})/);
+  if (!m) { ui.alert('Mês inválido.'); return; }
+  const mesAlvo = Number(m[1]) + '/' + Number(m[2]);
+
+  // 1) Avalia cada aba das planilhas-mestre via IA
+  const result = {}; // "SETOR||ASSUNTO" → {score, just}
+  FONTES_IA.forEach(function (fonte) {
+    fonte.planilhas.forEach(function (p) {
+      let ss; try { ss = SpreadsheetApp.openById(p.id); } catch (e) { return; }
+      ss.getSheets().forEach(function (sheet) {
+        const tab = sheet.getName();
+        const dest = (p.tabToSetor === 'IDENTIDADE') ? tab : p.tabToSetor[tab];
+        if (!dest) return;
+        const setores = Array.isArray(dest) ? dest : [dest];
+        const conteudo = sheet.getDataRange().getDisplayValues()
+          .map(function (r) { return r.join(' | '); }).join('\n').slice(0, 12000);
+        const av = avaliarIA(key, fonte.regra, fonte.assunto, conteudo, mesAlvo);
+        setores.forEach(function (s) { result[norm(s) + '||' + norm(fonte.assunto)] = av; });
+      });
+    });
+  });
+
+  // 2) Escreve na BaseGeral (linhas do mês alvo)
+  const base = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(BASEGERAL_TAB_NAME);
+  const bvals = base.getDataRange().getValues();
+  let escritos = 0, log = [];
+  for (let i = 1; i < bvals.length; i++) {
+    if (mesAno(bvals[i][0]) !== mesAlvo) continue;
+    const k = norm(bvals[i][1]) + '||' + norm(bvals[i][2]);
+    if (result[k]) {
+      base.getRange(i + 1, 4).setValue(result[k].score);
+      log.push(bvals[i][1] + ' / ' + bvals[i][2] + ' = ' + result[k].score + '  (' + result[k].just + ')');
+      escritos++;
+    }
+  }
+  ui.alert('IA — ' + escritos + ' avaliações escritas (' + mesAlvo + ').\n\n' + log.slice(0, 20).join('\n'));
+}
+
+function avaliarIA(key, regra, assunto, conteudo, mesAlvo) {
+  const prompt =
+    'Avalie o item SGE "' + assunto + '" para UM setor, com base na planilha abaixo.\n' +
+    'Regra de pontuação: ' + regra + '\n' +
+    'Mês de referência: ' + mesAlvo + '. Considere "atualizado" se a última atualização estiver dentro dos 90 dias anteriores a esse mês.\n\n' +
+    'Conteúdo da aba:\n' + conteudo + '\n\n' +
+    'Responda APENAS um JSON: {"score": 0|3|5, "justificativa": "frase curta"}';
+  const payload = {
+    model: OPENAI_MODEL, temperature: 0,
+    response_format: { type: 'json_object' },
+    messages: [{ role: 'user', content: prompt }],
+  };
+  try {
+    const r = UrlFetchApp.fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'post', contentType: 'application/json',
+      headers: { Authorization: 'Bearer ' + key },
+      payload: JSON.stringify(payload), muteHttpExceptions: true,
+    });
+    const j = JSON.parse(r.getContentText());
+    const parsed = JSON.parse(j.choices[0].message.content);
+    return { score: parsed.score, just: String(parsed.justificativa || '').slice(0, 120) };
+  } catch (e) {
+    return { score: 3, just: 'falha IA: ' + e };
+  }
 }
