@@ -33,36 +33,34 @@ const COL_TIPO = 5;
 const ESCREVER_ZERO_QUANDO_VAZIO = false;
 
 // ─── Mapa Setor (Forms "Empresa: Setor") → Setor (BaseGeral) ───────────────
-// ⚠️ REVISE: a BaseGeral não separa empresa. Decida como Escan/Grupo Even/LocExpress
-//    se encaixam nos 8 setores (Administrativo, Comercial, Compras, DP/RH,
-//    Financeiro, Implantação, Marketing, Performance). Use '' para IGNORAR.
+// Valor pode ser uma string OU um array (conta para vários setores).
+// Use '' ou [] para IGNORAR.
 const SETOR_MAP = {
   'LocExpress: Implantação':       'Implantação',
   'LocExpress: SAF & Performance': 'Performance',
   'LocExpress: Comercial':         'Comercial',
-  'Escan: Comercial':              'Comercial',     // ⚠️ Escan entra junto do Comercial? confirmar
+  'Escan: Comercial':              'Comercial',
   'Grupo Even: Marketing':         'Marketing',
   'Grupo Even: RH':                'DP/RH',
   'Grupo Even: Compras':           'Compras',
-  'Grupo Even: Adm/Financeiro':    'Financeiro',    // ⚠️ ou 'Administrativo'? confirmar
-  'LocExpress: Franchising':       '',              // ⚠️ não existe na BaseGeral — ignorado
+  'Grupo Even: Adm/Financeiro':    ['Administrativo', 'Financeiro'], // conta para os dois
+  'LocExpress: Franchising':       '',                               // não existe na BaseGeral — ignorado
 };
 
 // ─── Mapa Tipo (Forms) → Assunto (BaseGeral) ───────────────────────────────
 const TIPO_MAP = {
-  'Reunião de bom dia':                                                 'REUNIÃO DO BOM DIA',
-  'Cumbuca':                                                            'CUMBUCA',
-  'Benchmark':                                                          'BENCHMARKING',
-  'RAR com a equipe':                                                   'R.A.R - REUNIÃO DE APRESENTAÇÃO DE RESULTADOS - equipe',
-  'TRP -  Técnica de Resolução de Problemas':                          'TRP - TÉCNICA DE RESOLUÇÃO DE PROBLEMAS',
-  'Funcionograma - Atualização':                                       'FUNCIONOGRAMAS',
-  'Matriz de Backup':                                                  'PLANO DE DESENVOLVIMENTO DE BACKUP',
-  'Autodiagnóstico do SGE':                                            'AUTODIAGNÓSTICO',
-  'Matriz de Habilidades / PDI - Plano de Desenvolvimento Individual': 'PDI - PLANO DE DESENVOLVIMENTO INDIVIDUAL',
-  'POP - Atualização':                                                 'POP´S',
-  'Fluxograma - Atualização':                                          'FLUXOGRAMAS',
-  // Não pontuam (sem assunto correspondente): 'Follow-up com a equipe',
-  // 'Reunião SGE com a equipe', 'T&D - Treinamento e desenvolvimento'
+  'Reunião de bom dia':                       'REUNIÃO DO BOM DIA',
+  'Cumbuca':                                  'CUMBUCA',
+  'Benchmark':                                'BENCHMARKING',
+  'RAR com a equipe':                         'R.A.R - REUNIÃO DE APRESENTAÇÃO DE RESULTADOS - equipe',
+  'TRP -  Técnica de Resolução de Problemas': 'TRP - TÉCNICA DE RESOLUÇÃO DE PROBLEMAS',
+  'Funcionograma - Atualização':              'FUNCIONOGRAMAS',
+  'Autodiagnóstico do SGE':                   'AUTODIAGNÓSTICO',
+  'Fluxograma - Atualização':                 'FLUXOGRAMAS',
+  // Preenchidos MANUALMENTE pelo gestor (agente NÃO mexe): POP´S, PDI, BACKUP,
+  // R.A.R diretoria, INDICADORES.
+  // Tipos sem assunto (ignorados): Follow-up com a equipe, Reunião SGE com a
+  // equipe, T&D - Treinamento e desenvolvimento.
 };
 
 // ─── Regras de pontuação por contagem (qtd de registros → pontos) ──────────
@@ -134,13 +132,16 @@ function calcularMes() {
     if (mesAno(r[COL_DATA_EVENTO - 1]) !== mesAlvo) continue;
     const setorForms = String(r[COL_SETOR - 1] || '').trim();
     const tipoForms = String(r[COL_TIPO - 1] || '').trim();
-    const setor = SETOR_MAP[setorForms];
+    const setorRaw = SETOR_MAP[setorForms];
     const assunto = TIPO_MAP[tipoForms];
-    if (setor === undefined) { ignoradosSetor[setorForms] = (ignoradosSetor[setorForms] || 0) + 1; continue; }
-    if (!setor) continue;            // mapeado para '' = ignorar
+    if (setorRaw === undefined) { ignoradosSetor[setorForms] = (ignoradosSetor[setorForms] || 0) + 1; continue; }
+    const setores = Array.isArray(setorRaw) ? setorRaw : (setorRaw ? [setorRaw] : []);
+    if (setores.length === 0) continue;   // mapeado para '' = ignorar
     if (!assunto) { ignoradosTipo[tipoForms] = (ignoradosTipo[tipoForms] || 0) + 1; continue; }
-    const k = norm(setor) + '||' + norm(assunto);
-    contagem[k] = (contagem[k] || 0) + 1;
+    setores.forEach(function (setor) {
+      const k = norm(setor) + '||' + norm(assunto);
+      contagem[k] = (contagem[k] || 0) + 1;
+    });
   }
 
   // 2) Escreve na BaseGeral (só nas linhas do mês alvo)
