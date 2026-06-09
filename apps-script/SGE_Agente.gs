@@ -191,7 +191,17 @@ const FONTES_IA = [
     regra: 'Backup mapeado para 100% dos titulares E planilha atualizada nos últimos 90 dias = 5. ' +
            'Parcial (faltam titulares) OU desatualizada (>90 dias) = 3. Sem dados = 0.',
     planilhas: [
-      { id: '1kYvFxZuqf8YVhaKUtn6rfCqaz9un9untZodKfBvzxsM', tabToSetor: 'IDENTIDADE' }, // Backup LOC
+      { id: '1kYvFxZuqf8YVhaKUtn6rfCqaz9un9untZodKfBvzxsM',                              // Backup LOC
+        tabToSetor: {
+          'Projetos':       '',                          // auditoria — não entra na conta
+          'Franchising':    ['Implantação', 'Performance'],
+          'Marketing':      'Marketing',
+          'Comercial':      'Comercial',
+          'RH':             'DP/RH',
+          'Financeiro':     'Financeiro',
+          'Administrativo': 'Administrativo',
+          'Compras':        'Compras',
+        } },
       { id: '1GSBF_VTg4LULG8FeOxMlWa4HLQf_9v5XiPs9I88l4ys',                              // Backup ESCAN
         tabToSetor: { 'Operacional': 'Operacional Escan', 'Comercial': 'Comercial Escan' } },
     ],
@@ -214,13 +224,19 @@ function calcularMesIA() {
 
   // 1) Avalia cada aba das planilhas-mestre via IA
   const result = {}; // "SETOR||ASSUNTO" → {score, just}
+  const erros = [], ignoradas = [];
   FONTES_IA.forEach(function (fonte) {
     fonte.planilhas.forEach(function (p) {
-      let ss; try { ss = SpreadsheetApp.openById(p.id); } catch (e) { return; }
+      let ss;
+      try { ss = SpreadsheetApp.openById(p.id); }
+      catch (e) { erros.push('Não consegui abrir a planilha ' + p.id + ' → ' + e); return; }
       ss.getSheets().forEach(function (sheet) {
         const tab = sheet.getName();
-        const dest = (p.tabToSetor === 'IDENTIDADE') ? tab : p.tabToSetor[tab];
-        if (!dest) return;
+        let dest;
+        if (p.tabToSetor === 'IDENTIDADE') dest = tab;
+        else { for (var k in p.tabToSetor) { if (norm(k) === norm(tab)) { dest = p.tabToSetor[k]; break; } } }
+        if (dest === undefined) { ignoradas.push(ss.getName() + ' → "' + tab + '"'); return; }
+        if (!dest) return; // '' = ignorar de propósito (ex.: Projetos)
         const setores = Array.isArray(dest) ? dest : [dest];
         const conteudo = sheet.getDataRange().getDisplayValues()
           .map(function (r) { return r.join(' | '); }).join('\n').slice(0, 12000);
@@ -243,7 +259,11 @@ function calcularMesIA() {
       escritos++;
     }
   }
-  ui.alert('IA — ' + escritos + ' avaliações escritas (' + mesAlvo + ').\n\n' + log.slice(0, 20).join('\n'));
+  let msg = 'IA — ' + escritos + ' avaliações escritas (' + mesAlvo + ').\n\n' + log.slice(0, 25).join('\n');
+  if (ignoradas.length) msg += '\n\n⚠️ Abas não reconhecidas (ajuste o tabToSetor): \n' + ignoradas.join('\n');
+  if (erros.length) msg += '\n\n❌ Erros: \n' + erros.join('\n');
+  if (!escritos && !erros.length && !ignoradas.length) msg += '\n\n(Nada escrito — confira se autorizou as permissões na 1ª execução.)';
+  ui.alert(msg);
 }
 
 function avaliarIA(key, regra, assunto, conteudo, mesAlvo) {
