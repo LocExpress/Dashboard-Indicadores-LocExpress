@@ -39,7 +39,7 @@ const SETOR_MAP = {
   'LocExpress: Implantação':       'Implantação',
   'LocExpress: SAF & Performance': 'Performance',
   'LocExpress: Comercial':         'Comercial',
-  'Escan: Comercial':              'Comercial',
+  'Escan: Comercial':              'Comercial Escan',  // Escan tem setor próprio na BaseGeral
   'Grupo Even: Marketing':         'Marketing',
   'Grupo Even: RH':                'DP/RH',
   'Grupo Even: Compras':           'Compras',
@@ -193,7 +193,7 @@ const FONTES_IA = [
     planilhas: [
       { id: '1kYvFxZuqf8YVhaKUtn6rfCqaz9un9untZodKfBvzxsM', tabToSetor: 'IDENTIDADE' }, // Backup LOC
       { id: '1GSBF_VTg4LULG8FeOxMlWa4HLQf_9v5XiPs9I88l4ys',                              // Backup ESCAN
-        tabToSetor: { 'Operacional': '', 'Comercial': 'Comercial' } },                  // ⚠️ defina 'Operacional'
+        tabToSetor: { 'Operacional': 'Operacional Escan', 'Comercial': 'Comercial Escan' } },
     ],
   },
   // PRÓXIMOS (adicione no mesmo formato quando validarmos o piloto):
