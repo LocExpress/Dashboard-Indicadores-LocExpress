@@ -16,6 +16,7 @@ import utils
 from sge_page import page_diagnostico_sge
 from orcamento_page import page_orcamento
 from instagram_page import page_instagram
+from youtube_page import page_youtube
 
 # ─── Configuração da Página ───────────────────────────────────────────────────
 
@@ -1200,7 +1201,10 @@ def main():
         )
         st.markdown("<div style='margin-top:0.8rem'></div>", unsafe_allow_html=True)
 
-    tab_geral, tab_depto, tab_sge, tab_orc, tab_insta = st.tabs(["📊  Visão Geral", "🏢  Por Departamento", "🔍  Diagnóstico SGE", "💰  Orçamento", "📱  Instagram"])
+    tab_geral, tab_depto, tab_sge, tab_orc, tab_insta, tab_yt = st.tabs([
+        "📊  Visão Geral", "🏢  Por Departamento", "🔍  Diagnóstico SGE",
+        "💰  Orçamento", "📱  Instagram", "▶  YouTube",
+    ])
     with tab_geral:
         page_visao_geral(df_f)
     with tab_depto:
@@ -1211,6 +1215,8 @@ def main():
         page_orcamento()
     with tab_insta:
         page_instagram()
+    with tab_yt:
+        page_youtube()
 
 
 if __name__ == "__main__":
