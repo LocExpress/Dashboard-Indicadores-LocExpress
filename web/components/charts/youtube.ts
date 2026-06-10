@@ -35,7 +35,7 @@ export function chartYtViews(analytics: AnalyticsRow[]) {
     layout: {
       ...baseLayout(), title: title("Visualizações — Últimos 30 dias"),
       xaxis: { gridcolor: "#F0F0F0" }, yaxis: { gridcolor: "#F0F0F0" },
-      height: 240, showlegend: false,
+      height: 280, showlegend: false,
     },
   };
 }
@@ -59,7 +59,7 @@ export function chartYtEngagement(analytics: AnalyticsRow[]) {
       ...baseLayout(), title: title("Engajamento — Curtidas e Comentários"),
       barmode: "group", bargap: 0.2,
       xaxis: { gridcolor: "#F0F0F0" }, yaxis: { gridcolor: "#F0F0F0" },
-      height: 240,
+      height: 280,
       legend: { orientation: "h", y: 1.12, x: 0, bgcolor: "rgba(0,0,0,0)" },
     },
   };
@@ -86,7 +86,7 @@ export function chartYtSubscribers(analytics: AnalyticsRow[]) {
       ...baseLayout(), title: title("Inscritos — Ganhos e Perdidos"),
       barmode: "relative", bargap: 0.2,
       xaxis: { gridcolor: "#F0F0F0" }, yaxis: { gridcolor: "#F0F0F0" },
-      height: 240,
+      height: 280,
       legend: { orientation: "h", y: 1.12, x: 0, bgcolor: "rgba(0,0,0,0)" },
     },
   };
@@ -105,7 +105,7 @@ export function chartYtWatchtime(analytics: AnalyticsRow[]) {
     layout: {
       ...baseLayout(), title: title("Tempo Assistido — Minutos (30 dias)"),
       xaxis: { gridcolor: "#F0F0F0" }, yaxis: { gridcolor: "#F0F0F0" },
-      height: 240, showlegend: false,
+      height: 280, showlegend: false,
     },
   };
 }

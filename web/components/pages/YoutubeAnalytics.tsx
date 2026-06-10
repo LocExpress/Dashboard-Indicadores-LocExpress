@@ -70,13 +70,23 @@ const PERIODS = [
   { label: "90 dias", value: 90 },
 ] as const;
 
+type Metric = "views" | "engagement" | "subscribers" | "watchtime";
+
+const METRIC_TABS: { key: Metric; label: string; icon: string }[] = [
+  { key: "views",       label: "Visualizações",  icon: "👁️"  },
+  { key: "engagement",  label: "Engajamento",    icon: "👍"  },
+  { key: "subscribers", label: "Inscritos",      icon: "👥"  },
+  { key: "watchtime",   label: "Tempo Assistido", icon: "⏱️" },
+];
+
 export default function YoutubeAnalytics() {
   const [channel,   setChannel]   = useState<Channel | null>(null);
   const [analytics, setAnalytics] = useState<AnalyticsRow[]>([]);
   const [videos,    setVideos]    = useState<Video[]>([]);
-  const [loading,   setLoading]   = useState(true);
-  const [error,     setError]     = useState<string | null>(null);
-  const [days,      setDays]      = useState(30);
+  const [loading,      setLoading]      = useState(true);
+  const [error,        setError]        = useState<string | null>(null);
+  const [days,         setDays]         = useState(30);
+  const [activeMetric, setActiveMetric] = useState<Metric>("views");
 
   async function load(d = days) {
     setLoading(true);
@@ -209,18 +219,30 @@ export default function YoutubeAnalytics() {
         </div>
       )}
 
-      {/* ── Gráficos ── */}
+      {/* ── Gráfico com abas ── */}
       {analytics.length > 0 && (
         <>
-          <SecHeader>📈 Desempenho — Últimos {days} dias</SecHeader>
-          <div className="lx-grid" style={{ gridTemplateColumns: "1fr 1fr" }}>
-            <ChartBox><PlotlyChart {...chartYtViews(analytics)} /></ChartBox>
-            <ChartBox><PlotlyChart {...chartYtEngagement(analytics)} /></ChartBox>
+          <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
+            {METRIC_TABS.map((tab) => (
+              <button key={tab.key} onClick={() => setActiveMetric(tab.key)}
+                      style={{
+                        display: "inline-flex", alignItems: "center", gap: "0.35rem",
+                        padding: "0.4rem 1rem", borderRadius: 8, fontWeight: 700,
+                        fontSize: "0.82rem", cursor: "pointer", transition: "all 0.15s",
+                        border: `1.5px solid ${activeMetric === tab.key ? COLOR.RED : "#E5E7EB"}`,
+                        background: activeMetric === tab.key ? COLOR.RED : "#fff",
+                        color:      activeMetric === tab.key ? "#fff"    : "#374151",
+                      }}>
+                <span>{tab.icon}</span>{tab.label}
+              </button>
+            ))}
           </div>
-          <div className="lx-grid" style={{ gridTemplateColumns: "1fr 1fr" }}>
-            <ChartBox><PlotlyChart {...chartYtSubscribers(analytics)} /></ChartBox>
-            <ChartBox><PlotlyChart {...chartYtWatchtime(analytics)} /></ChartBox>
-          </div>
+          <ChartBox>
+            {activeMetric === "views"       && <PlotlyChart {...chartYtViews(analytics)} />}
+            {activeMetric === "engagement"  && <PlotlyChart {...chartYtEngagement(analytics)} />}
+            {activeMetric === "subscribers" && <PlotlyChart {...chartYtSubscribers(analytics)} />}
+            {activeMetric === "watchtime"   && <PlotlyChart {...chartYtWatchtime(analytics)} />}
+          </ChartBox>
         </>
       )}
 
