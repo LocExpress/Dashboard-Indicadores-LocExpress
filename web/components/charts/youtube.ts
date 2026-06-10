@@ -20,6 +20,21 @@ function fmtDate(d: string): string {
   }
 }
 
+function xAxis(x: string[]) {
+  return {
+    type: "category" as const,
+    categoryorder: "array" as const,
+    categoryarray: x,
+    gridcolor: "#F0F0F0",
+    tickangle: x.length > 20 ? -45 : 0,
+    tickfont: { size: 10 },
+    automargin: true,
+  };
+}
+
+const yAxis = { gridcolor: "#F0F0F0" };
+const MARGIN = { l: 40, r: 20, t: 44, b: 60 };
+
 export function chartYtViews(analytics: AnalyticsRow[]) {
   const x = analytics.map((r) => fmtDate(r.date));
   const y = analytics.map((r) => Number(r.views));
@@ -33,9 +48,10 @@ export function chartYtViews(analytics: AnalyticsRow[]) {
       hovertemplate: "%{x}<br>Views: %{y:,}<extra></extra>",
     }],
     layout: {
-      ...baseLayout(), title: title("Visualizações — Últimos 30 dias"),
-      xaxis: { gridcolor: "#F0F0F0" }, yaxis: { gridcolor: "#F0F0F0" },
-      height: 280, showlegend: false,
+      ...baseLayout(), title: title("Visualizações"),
+      xaxis: xAxis(x), yaxis: yAxis,
+      margin: MARGIN,
+      height: 300, showlegend: false,
     },
   };
 }
@@ -58,8 +74,9 @@ export function chartYtEngagement(analytics: AnalyticsRow[]) {
     layout: {
       ...baseLayout(), title: title("Engajamento — Curtidas e Comentários"),
       barmode: "group", bargap: 0.2,
-      xaxis: { gridcolor: "#F0F0F0" }, yaxis: { gridcolor: "#F0F0F0" },
-      height: 280,
+      xaxis: xAxis(x), yaxis: yAxis,
+      margin: MARGIN,
+      height: 300,
       legend: { orientation: "h", y: 1.12, x: 0, bgcolor: "rgba(0,0,0,0)" },
     },
   };
@@ -85,8 +102,9 @@ export function chartYtSubscribers(analytics: AnalyticsRow[]) {
     layout: {
       ...baseLayout(), title: title("Inscritos — Ganhos e Perdidos"),
       barmode: "relative", bargap: 0.2,
-      xaxis: { gridcolor: "#F0F0F0" }, yaxis: { gridcolor: "#F0F0F0" },
-      height: 280,
+      xaxis: xAxis(x), yaxis: yAxis,
+      margin: MARGIN,
+      height: 300,
       legend: { orientation: "h", y: 1.12, x: 0, bgcolor: "rgba(0,0,0,0)" },
     },
   };
@@ -103,9 +121,10 @@ export function chartYtWatchtime(analytics: AnalyticsRow[]) {
       hovertemplate: "%{x}<br>Minutos: %{y:,}<extra></extra>",
     }],
     layout: {
-      ...baseLayout(), title: title("Tempo Assistido — Minutos (30 dias)"),
-      xaxis: { gridcolor: "#F0F0F0" }, yaxis: { gridcolor: "#F0F0F0" },
-      height: 280, showlegend: false,
+      ...baseLayout(), title: title("Tempo Assistido (minutos)"),
+      xaxis: xAxis(x), yaxis: yAxis,
+      margin: MARGIN,
+      height: 300, showlegend: false,
     },
   };
 }
