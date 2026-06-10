@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { COLOR } from "@/lib/theme";
 import { KpiCard, ChartBox, DataTable, SecHeader, type Column } from "../ui";
 import PlotlyChart from "../charts/PlotlyChart";
+import { DateRangePicker } from "../youtube/DateRangePicker";
 import {
   chartYtViews, chartYtEngagement, chartYtSubscribers,
   chartYtWatchtime, chartYtTopVideos, type AnalyticsRow,
@@ -88,11 +89,17 @@ export default function YoutubeAnalytics() {
   const [days,         setDays]         = useState(30);
   const [activeMetric, setActiveMetric] = useState<Metric>("views");
 
-  async function load(d = days) {
+  function todayISO() { return new Date().toISOString().slice(0, 10); }
+  function daysAgoISO(n: number) { const d = new Date(); d.setDate(d.getDate() - n); return d.toISOString().slice(0, 10); }
+
+  const [startDate, setStartDate] = useState(daysAgoISO(30));
+  const [endDate,   setEndDate]   = useState(todayISO());
+
+  async function load(start = startDate, end = endDate) {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch(`/api/youtube/data?days=${d}`);
+      const res = await fetch(`/api/youtube/data?startDate=${start}&endDate=${end}`);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
       if (data.error) throw new Error(data.error);
@@ -107,11 +114,22 @@ export default function YoutubeAnalytics() {
   }
 
   function selectPeriod(d: number) {
+    const start = daysAgoISO(d);
+    const end   = todayISO();
     setDays(d);
-    load(d);
+    setStartDate(start);
+    setEndDate(end);
+    load(start, end);
   }
 
-  useEffect(() => { load(); }, []);
+  function applyCustom(start: string, end: string) {
+    setDays(0);
+    setStartDate(start);
+    setEndDate(end);
+    load(start, end);
+  }
+
+  useEffect(() => { load(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Totais 30 dias ────────────────────────────────────────────────────────
   const totalViews    = analytics.reduce((s, r) => s + Number(r.views), 0);
@@ -170,7 +188,7 @@ export default function YoutubeAnalytics() {
             </div>
           </div>
 
-          <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", flexWrap: "wrap" }}>
             {PERIODS.map((p) => (
               <button key={p.value} onClick={() => selectPeriod(p.value)}
                       style={{
@@ -184,10 +202,11 @@ export default function YoutubeAnalytics() {
                 {p.label}
               </button>
             ))}
-            <button onClick={() => load(days)}
+            <DateRangePicker startDate={startDate} endDate={endDate} onChange={applyCustom} />
+            <button onClick={() => load()}
                     style={{ background: "none", border: `1px solid ${COLOR.INDIGO}`, borderRadius: 8,
-                             padding: "0.35rem 0.9rem", fontWeight: 700, color: COLOR.INDIGO,
-                             cursor: "pointer", fontSize: "0.82rem", marginLeft: 4 }}>
+                             padding: "0.35rem 0.75rem", fontWeight: 700, color: COLOR.INDIGO,
+                             cursor: "pointer", fontSize: "0.82rem" }}>
               🔄
             </button>
           </div>
