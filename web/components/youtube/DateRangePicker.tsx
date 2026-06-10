@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import type { CSSProperties } from 'react'
 import { COLOR } from '@/lib/theme'
 
 const MONTHS = [
@@ -56,13 +57,13 @@ export function DateRangePicker({ startDate, endDate, onChange }: Props) {
     if (start <= end) onChange(start, end)
   }
 
-  const sel: React.CSSProperties = {
+  const sel: CSSProperties = {
     border: '1px solid #E5E7EB', borderRadius: 6,
     padding: '0.3rem 0.4rem', fontSize: '0.8rem',
     color: '#374151', background: '#fff', cursor: 'pointer', outline: 'none',
   }
 
-  const label: React.CSSProperties = {
+  const label: CSSProperties = {
     fontSize: '0.75rem', fontWeight: 700, color: '#6B7280',
   }
 
