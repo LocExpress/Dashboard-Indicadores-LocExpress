@@ -64,18 +64,25 @@ const VIDEO_COLS: Column[] = [
   },
 ];
 
+const PERIODS = [
+  { label: "7 dias",  value: 7  },
+  { label: "30 dias", value: 30 },
+  { label: "90 dias", value: 90 },
+] as const;
+
 export default function YoutubeAnalytics() {
   const [channel,   setChannel]   = useState<Channel | null>(null);
   const [analytics, setAnalytics] = useState<AnalyticsRow[]>([]);
   const [videos,    setVideos]    = useState<Video[]>([]);
   const [loading,   setLoading]   = useState(true);
   const [error,     setError]     = useState<string | null>(null);
+  const [days,      setDays]      = useState(30);
 
-  async function load() {
+  async function load(d = days) {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch("/api/youtube/data");
+      const res = await fetch(`/api/youtube/data?days=${d}`);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
       if (data.error) throw new Error(data.error);
@@ -87,6 +94,11 @@ export default function YoutubeAnalytics() {
     } finally {
       setLoading(false);
     }
+  }
+
+  function selectPeriod(d: number) {
+    setDays(d);
+    load(d);
   }
 
   useEffect(() => { load(); }, []);
@@ -126,11 +138,11 @@ export default function YoutubeAnalytics() {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
 
-      {/* ── Canal ── */}
+      {/* ── Canal + filtro de período ── */}
       {channel && (
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between",
                       background: "#fff", borderRadius: 14, padding: "0.9rem 1.4rem",
-                      boxShadow: "0 2px 12px rgba(0,0,0,0.07)" }}>
+                      boxShadow: "0 2px 12px rgba(0,0,0,0.07)", flexWrap: "wrap", gap: "0.75rem" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
             {channel.thumbnail_url && (
               <img src={channel.thumbnail_url} alt={channel.title}
@@ -147,12 +159,28 @@ export default function YoutubeAnalytics() {
               )}
             </div>
           </div>
-          <button onClick={load}
-                  style={{ background: "none", border: `1px solid ${COLOR.INDIGO}`, borderRadius: 8,
-                           padding: "0.4rem 1rem", fontWeight: 700, color: COLOR.INDIGO,
-                           cursor: "pointer", fontSize: "0.82rem" }}>
-            🔄 Atualizar
-          </button>
+
+          <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+            {PERIODS.map((p) => (
+              <button key={p.value} onClick={() => selectPeriod(p.value)}
+                      style={{
+                        padding: "0.35rem 0.9rem", borderRadius: 8, fontWeight: 700,
+                        fontSize: "0.82rem", cursor: "pointer",
+                        border: `1.5px solid ${COLOR.INDIGO}`,
+                        background: days === p.value ? COLOR.INDIGO : "transparent",
+                        color:      days === p.value ? "#fff"        : COLOR.INDIGO,
+                        transition: "all 0.15s",
+                      }}>
+                {p.label}
+              </button>
+            ))}
+            <button onClick={() => load(days)}
+                    style={{ background: "none", border: `1px solid ${COLOR.INDIGO}`, borderRadius: 8,
+                             padding: "0.35rem 0.9rem", fontWeight: 700, color: COLOR.INDIGO,
+                             cursor: "pointer", fontSize: "0.82rem", marginLeft: 4 }}>
+              🔄
+            </button>
+          </div>
         </div>
       )}
 
@@ -162,21 +190,21 @@ export default function YoutubeAnalytics() {
           <KpiCard label="Inscritos"       value={fmtNum(channel.subscriber_count)} color="#EF4444" unit="Total do canal" />
           <KpiCard label="Views totais"    value={fmtNum(channel.view_count)}       color={COLOR.INDIGO} unit="Histórico" />
           <KpiCard label="Vídeos"          value={fmtNum(channel.video_count)}      color={COLOR.ORANGE} unit="No canal" />
-          <KpiCard label="Views (30 dias)" value={fmtNum(totalViews)}              color={COLOR.GREEN}  unit="Últimos 30 dias" />
+          <KpiCard label={`Views (${days}d)`} value={fmtNum(totalViews)}            color={COLOR.GREEN}  unit={`Últimos ${days} dias`} />
         </div>
       )}
 
       {/* ── KPI Cards — linha 2 ── */}
       {analytics.length > 0 && (
         <div className="lx-grid" style={{ gridTemplateColumns: "repeat(4, 1fr)" }}>
-          <KpiCard label="Curtidas (30d)"    value={fmtNum(totalLikes)}    color={COLOR.INDIGO} unit="Últimos 30 dias" />
-          <KpiCard label="Comentários (30d)" value={fmtNum(totalComments)} color={COLOR.ORANGE} unit="Últimos 30 dias" />
-          <KpiCard label="Min. assistidos"   value={fmtNum(totalMinutes)}  color={COLOR.YELLOW} unit="Últimos 30 dias" />
+          <KpiCard label={`Curtidas (${days}d)`}    value={fmtNum(totalLikes)}    color={COLOR.INDIGO} unit={`Últimos ${days} dias`} />
+          <KpiCard label={`Comentários (${days}d)`} value={fmtNum(totalComments)} color={COLOR.ORANGE} unit={`Últimos ${days} dias`} />
+          <KpiCard label="Min. assistidos"          value={fmtNum(totalMinutes)}  color={COLOR.YELLOW} unit={`Últimos ${days} dias`} />
           <KpiCard
             label="Inscritos líquidos"
             value={`${netSubs >= 0 ? "+" : ""}${fmtNum(netSubs)}`}
             color={netSubs >= 0 ? COLOR.GREEN : COLOR.RED}
-            unit="Ganhos − perdidos (30d)"
+            unit={`Ganhos − perdidos (${days}d)`}
           />
         </div>
       )}
@@ -184,7 +212,7 @@ export default function YoutubeAnalytics() {
       {/* ── Gráficos ── */}
       {analytics.length > 0 && (
         <>
-          <SecHeader>📈 Desempenho — Últimos 30 dias</SecHeader>
+          <SecHeader>📈 Desempenho — Últimos {days} dias</SecHeader>
           <div className="lx-grid" style={{ gridTemplateColumns: "1fr 1fr" }}>
             <ChartBox><PlotlyChart {...chartYtViews(analytics)} /></ChartBox>
             <ChartBox><PlotlyChart {...chartYtEngagement(analytics)} /></ChartBox>

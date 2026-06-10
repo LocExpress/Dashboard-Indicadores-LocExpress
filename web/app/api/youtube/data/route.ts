@@ -14,15 +14,21 @@ async function query(table: string, params: Record<string, string> = {}) {
   return res.json();
 }
 
-export async function GET() {
+export async function GET(req: Request) {
   if (!SUPABASE_URL || !SERVICE_KEY) {
     return NextResponse.json({ error: "Supabase não configurado" }, { status: 500 });
   }
 
+  const { searchParams } = new URL(req.url);
+  const days = Math.min(Math.max(Number(searchParams.get("days") ?? "30"), 7), 365);
+  const startDate = new Date();
+  startDate.setDate(startDate.getDate() - days);
+  const startISO = startDate.toISOString().slice(0, 10);
+
   try {
     const [channels, analytics, videos] = await Promise.all([
       query("youtube_channels", { order: "created_at.desc", limit: "1" }),
-      query("youtube_channel_analytics", { order: "date.asc", limit: "30" }),
+      query("youtube_channel_analytics", { order: "date.asc", limit: String(days), "date": `gte.${startISO}` }),
       query("youtube_videos", { order: "score.desc", limit: "50" }),
     ]);
 
