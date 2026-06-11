@@ -128,8 +128,9 @@ export default function GoogleAnalytics() {
       textinfo: "label+percent",
     }],
     layout: {
-      height: 260, showlegend: false, plot_bgcolor: "#fff", paper_bgcolor: "#fff",
-      margin: { l: 10, r: 10, t: 10, b: 10 },
+      height: 400, showlegend: true, plot_bgcolor: "#fff", paper_bgcolor: "#fff",
+      margin: { l: 20, r: 20, t: 20, b: 20 },
+      legend: { orientation: "h" as const, y: -0.1 },
     },
   };
 
@@ -145,7 +146,7 @@ export default function GoogleAnalytics() {
       textfont: { size: 11, color: "#374151" },
     }],
     layout: {
-      height: Math.max(260, topCities.length * 32 + 60),
+      height: Math.max(400, topCities.length * 38 + 60),
       plot_bgcolor: "#fff", paper_bgcolor: "#fff",
       margin: { l: 10, r: 80, t: 10, b: 10 },
       xaxis: { gridcolor: "#F0F0F0", range: [0, Math.max(...topCities.map(r => r.users)) * 1.35], tickfont: { size: 9 } },
