@@ -140,9 +140,11 @@ export default function GoogleAnalytics() {
       y: topCities.map((r) => r.city || "(não definido)"),
       marker: { color: COLOR.INDIGO },
       text: topCities.map((r) => fmt(r.users)),
-      textposition: "outside" as const,
+      textposition: "auto" as const,
       cliponaxis: false,
-      textfont: { size: 12, color: "#374151" },
+      insidetextanchor: "middle" as const,
+      textfont: { size: 12, color: "#fff" },
+      outsidetextfont: { size: 12, color: "#374151" },
     }],
     layout: {
       height: Math.max(260, topCities.length * 32 + 60),
