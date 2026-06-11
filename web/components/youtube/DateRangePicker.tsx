@@ -30,7 +30,7 @@ interface Props {
 
 export function DateRangePicker({ startDate, endDate, onChange }: Props) {
   const currentYear = new Date().getFullYear()
-  const years = Array.from({ length: currentYear - 2020 + 1 }, (_, i) => 2020 + i)
+  const years = Array.from({ length: currentYear - 2026 + 1 }, (_, i) => 2026 + i)
 
   const [s, setS] = useState(parseISO(startDate))
   const [e, setE] = useState(parseISO(endDate))
