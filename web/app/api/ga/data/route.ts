@@ -20,7 +20,7 @@ export async function GET(req: Request) {
     const client = getClient();
     const property = `properties/${PROPERTY_ID}`;
 
-    const [overview, pages, cities, devices, daily] = await Promise.all([
+    const [overview, pages, cities, allCities, devices, daily] = await Promise.all([
       // KPIs gerais
       client.runReport({
         property,
@@ -45,7 +45,7 @@ export async function GET(req: Request) {
         limit: 10,
       }),
 
-      // Top cidades
+      // Top 10 cidades (gráfico)
       client.runReport({
         property,
         dateRanges: [{ startDate, endDate }],
@@ -53,6 +53,16 @@ export async function GET(req: Request) {
         metrics: [{ name: "activeUsers" }, { name: "sessions" }],
         orderBys: [{ metric: { metricName: "activeUsers" }, desc: true }],
         limit: 10,
+      }),
+
+      // Todas as cidades (tabela)
+      client.runReport({
+        property,
+        dateRanges: [{ startDate, endDate }],
+        dimensions: [{ name: "city" }],
+        metrics: [{ name: "activeUsers" }, { name: "sessions" }],
+        orderBys: [{ metric: { metricName: "activeUsers" }, desc: true }],
+        limit: 500,
       }),
 
       // Dispositivos
@@ -118,7 +128,14 @@ export async function GET(req: Request) {
       };
     });
 
-    return NextResponse.json({ kpis, topPages, topCities, deviceData, dailySeries });
+    // Todas as cidades
+    const allCitiesData = (allCities[0]?.rows ?? []).map((r) => ({
+      city:     r.dimensionValues?.[0]?.value ?? "",
+      users:    Number(r.metricValues?.[0]?.value ?? 0),
+      sessions: Number(r.metricValues?.[1]?.value ?? 0),
+    }));
+
+    return NextResponse.json({ kpis, topPages, topCities, allCities: allCitiesData, deviceData, dailySeries });
   } catch (err: any) {
     console.error("[GA API]", err);
     return NextResponse.json({ error: err.message ?? "Falha ao buscar dados do GA" }, { status: 500 });

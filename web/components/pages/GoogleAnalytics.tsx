@@ -56,6 +56,7 @@ export default function GoogleAnalytics() {
   const [kpis,        setKpis]        = useState<Kpis | null>(null);
   const [topPages,    setTopPages]    = useState<PageRow[]>([]);
   const [topCities,   setTopCities]   = useState<CityRow[]>([]);
+  const [allCities,   setAllCities]   = useState<CityRow[]>([]);
   const [deviceData,  setDeviceData]  = useState<DeviceRow[]>([]);
   const [dailySeries, setDailySeries] = useState<DayRow[]>([]);
   const [loading,     setLoading]     = useState(true);
@@ -74,6 +75,7 @@ export default function GoogleAnalytics() {
       setKpis(data.kpis);
       setTopPages(data.topPages ?? []);
       setTopCities(data.topCities ?? []);
+      setAllCities(data.allCities ?? []);
       setDeviceData(data.deviceData ?? []);
       setDailySeries(data.dailySeries ?? []);
     } catch (e: any) {
@@ -231,11 +233,11 @@ export default function GoogleAnalytics() {
       )}
 
       {/* ── Top cidades tabela ── */}
-      {topCities.length > 0 && (
+      {allCities.length > 0 && (
         <>
           <SecHeader>🌎 Acessos por cidade</SecHeader>
           <ChartBox>
-            <DataTable columns={CITY_COLS} rows={topCities as any} maxHeight={360} />
+            <DataTable columns={CITY_COLS} rows={allCities as any} maxHeight={360} />
           </ChartBox>
         </>
       )}
