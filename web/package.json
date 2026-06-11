@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@clerk/nextjs": "^7.4.3",
+    "@google-analytics/data": "^6.1.0",
     "next": "16.2.7",
     "papaparse": "^5.5.3",
     "plotly.js-dist-min": "^3.6.0",
