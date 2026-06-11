@@ -61,7 +61,7 @@ export default function GoogleAnalytics() {
   const [loading,     setLoading]     = useState(true);
   const [error,       setError]       = useState<string | null>(null);
   const [days,        setDays]        = useState(30);
-  const [startDate,   setStartDate]   = useState(daysAgoISO(30));
+  const [startDate,   setStartDate]   = useState("2026-01-01");
   const [endDate,     setEndDate]     = useState(todayISO());
 
   async function load(start = startDate, end = endDate) {
@@ -169,17 +169,19 @@ export default function GoogleAnalytics() {
       {/* ── Filtro de período ── */}
       <div style={{ background: "#fff", borderRadius: 14, padding: "0.9rem 1.4rem",
                     boxShadow: "0 2px 12px rgba(0,0,0,0.07)",
-                    display: "flex", alignItems: "center", flexWrap: "wrap", gap: "0.5rem" }}>
-        {PERIODS.map((p) => (
-          <button key={p.value} onClick={() => selectPeriod(p.value)}
-                  style={{ padding: "0.35rem 0.9rem", borderRadius: 8, fontWeight: 700,
-                           fontSize: "0.82rem", cursor: "pointer", transition: "all 0.15s",
-                           border: `1.5px solid ${COLOR.INDIGO}`,
-                           background: days === p.value ? COLOR.INDIGO : "transparent",
-                           color: days === p.value ? "#fff" : COLOR.INDIGO }}>
-            {p.label}
-          </button>
-        ))}
+                    display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "0.5rem" }}>
+        <div style={{ display: "flex", gap: "0.5rem" }}>
+          {PERIODS.map((p) => (
+            <button key={p.value} onClick={() => selectPeriod(p.value)}
+                    style={{ padding: "0.35rem 0.9rem", borderRadius: 8, fontWeight: 700,
+                             fontSize: "0.82rem", cursor: "pointer", transition: "all 0.15s",
+                             border: `1.5px solid ${COLOR.INDIGO}`,
+                             background: days === p.value ? COLOR.INDIGO : "transparent",
+                             color: days === p.value ? "#fff" : COLOR.INDIGO }}>
+              {p.label}
+            </button>
+          ))}
+        </div>
         <DateRangePicker startDate={startDate} endDate={endDate} onChange={applyCustom} />
       </div>
 
