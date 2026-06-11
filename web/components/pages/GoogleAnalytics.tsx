@@ -150,7 +150,7 @@ export default function GoogleAnalytics() {
       height: Math.max(260, topCities.length * 32 + 60),
       plot_bgcolor: "#fff", paper_bgcolor: "#fff",
       margin: { l: 10, r: 60, t: 10, b: 10 },
-      xaxis: { gridcolor: "#F0F0F0", autorange: true },
+      xaxis: { gridcolor: "#F0F0F0", range: [0, Math.max(...topCities.map(r => r.users)) * 1.25] },
       yaxis: { automargin: true, tickfont: { size: 11 } },
       showlegend: false,
     },
