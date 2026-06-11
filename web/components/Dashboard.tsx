@@ -21,7 +21,7 @@ const TABS = [
   { id: "sge", label: "🔍  Diagnóstico SGE", sidebar: false },
   { id: "orc", label: "💰  Orçamento", sidebar: false },
   { id: "mkt", label: "📣  Marketing", sidebar: false },
-  { id: "analytics", label: "📈  Analytics", sidebar: false },
+  { id: "analytics", label: "📈  Portal do Franqueado", sidebar: false },
 ] as const;
 
 type TabId = (typeof TABS)[number]["id"];
