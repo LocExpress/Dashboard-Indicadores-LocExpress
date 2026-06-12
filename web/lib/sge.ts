@@ -37,6 +37,7 @@ export const REGRAS_CALCULO: Record<string, string> = {
   "PDI": "Ter PDI = 5 pts; Não ter = 0",
   "PLANO DE DESENVOLVIMENTO DE BACKUP": "Ter plano atualizado = 5 pts",
   "CUMBUCA": "1-2 registros = 3 pts; 3+ = 5 pts",
+  "T&D": "1-2 registros = 3 pts; 3+ = 5 pts",
 };
 
 export function norm(s: unknown): string {
