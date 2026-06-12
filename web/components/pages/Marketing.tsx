@@ -1,11 +1,13 @@
 "use client";
 import { useState } from "react";
 import YoutubeAnalytics from "./YoutubeAnalytics";
+import Instagram from "./Instagram";
 
 const REDES = [
-  { id: "instagram", label: "📸 Instagram" },
-  { id: "youtube",   label: "▶️ YouTube"   },
-  { id: "linkedin",  label: "💼 LinkedIn"  },
+  { id: "instagram",  label: "📸 Instagram" },
+  { id: "youtube",    label: "▶️ YouTube"   },
+  { id: "linkedin",   label: "💼 LinkedIn"  },
+  { id: "franquias",  label: "🏪 Instagram Franquias" },
 ] as const;
 
 type RedeId = (typeof REDES)[number]["id"];
@@ -19,7 +21,7 @@ export default function Marketing() {
                     padding: "1.2rem 1.8rem", marginBottom: "1.2rem", color: "#fff" }}>
         <div style={{ fontSize: "1.3rem", fontWeight: 900 }}>📣 Resultados de Marketing</div>
         <div style={{ fontSize: "0.85rem", opacity: 0.88, marginTop: 4 }}>
-          Desempenho das redes sociais da LocExpress — Instagram, YouTube e LinkedIn
+          Desempenho das redes sociais da LocExpress — Instagram, YouTube, LinkedIn e Franquias
         </div>
       </div>
 
@@ -32,11 +34,19 @@ export default function Marketing() {
         ))}
       </div>
 
-      {active === "youtube" ? (
+      {active === "youtube" && (
         <div style={{ marginTop: "1rem" }}>
           <YoutubeAnalytics />
         </div>
-      ) : (
+      )}
+
+      {active === "franquias" && (
+        <div style={{ marginTop: "1rem" }}>
+          <Instagram />
+        </div>
+      )}
+
+      {(active === "instagram" || active === "linkedin") && (
         <div className="mkt-frame-wrap">
           <iframe
             key={active}
