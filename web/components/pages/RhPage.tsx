@@ -1,11 +1,33 @@
 "use client";
 import { useMemo, useState } from "react";
-import { KpiCard, SecHeader, DataTable, BodySelect, type Column } from "../ui";
+import { KpiCard, SecHeader, DataTable, BodySelect, ChartBox, Collapsible, type Column } from "../ui";
+import PlotlyChart from "../charts/PlotlyChart";
 import { fmtBrl } from "@/lib/format";
 import { calcTotais, agrupar, type RhRow } from "@/lib/rh";
+import { chartCustoPorSetor, chartCustoPorUnidade, chartComposicaoCusto } from "../charts/rh";
 
 const C = { INDIGO: "#2D3192", ORANGE: "#F47920", GREEN: "#00C853", BLUE: "#2563EB", PURPLE: "#7C3AED" };
 const SESSION_KEY = "rh_data_v1";
+
+/** R$ compacto p/ caber nos KPIs sem quebrar linha (R$ 233,3 mil). */
+function brCompact(v: number): string {
+  const a = Math.abs(v);
+  if (a >= 1_000_000) return `R$ ${(v / 1_000_000).toLocaleString("pt-BR", { minimumFractionDigits: 1, maximumFractionDigits: 1 })} mi`;
+  if (a >= 1_000) return `R$ ${(v / 1_000).toLocaleString("pt-BR", { minimumFractionDigits: 1, maximumFractionDigits: 1 })} mil`;
+  return fmtBrl(v);
+}
+
+function InsightCard({ icon, title, value, desc, color }: { icon: string; title: string; value: string; desc: string; color: string }) {
+  return (
+    <div style={{ background: "#fff", border: "1px solid #EEF0F4", borderRadius: 12, padding: "0.9rem 1rem", borderTop: `3px solid ${color}` }}>
+      <div style={{ fontSize: "0.7rem", fontWeight: 700, color: "#6B7280", textTransform: "uppercase", letterSpacing: "0.05em" }}>
+        {icon} {title}
+      </div>
+      <div style={{ fontSize: "1.45rem", fontWeight: 900, color, lineHeight: 1.15, marginTop: 4 }}>{value}</div>
+      <div style={{ fontSize: "0.72rem", color: "#9CA3AF", marginTop: 3 }}>{desc}</div>
+    </div>
+  );
+}
 
 export default function RhPage() {
   const [data, setData] = useState<RhRow[] | null>(() => {
@@ -21,6 +43,7 @@ export default function RhPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [unidadeView, setUnidadeView] = useState("Todas");
+  const [faturamento, setFaturamento] = useState("");
 
   async function unlock(e?: React.FormEvent) {
     e?.preventDefault();
@@ -113,7 +136,17 @@ export default function RhPage() {
     );
   }
 
-  // ─── Dashboard de RH ───────────────────────────────────────────────
+  // ─── Insights calculados ───────────────────────────────────────────
+  const topSetor = porSetor[0];
+  const topSetorPct = topSetor && tot.custoTotal > 0 ? (topSetor.custoTotal / tot.custoTotal) * 100 : 0;
+  const topUnidade = porUnidade[0];
+  const topUnidadePct = topUnidade && tot.custoTotal > 0 ? (topUnidade.custoTotal / tot.custoTotal) * 100 : 0;
+  const benefPctFolha = tot.folhaBruta > 0 ? (tot.beneficios / tot.folhaBruta) * 100 : 0;
+  const custoMedio = tot.headcount > 0 ? tot.custoTotal / tot.headcount : 0;
+
+  const fatNum = brToNumber(faturamento);
+  const folhaVsFat = fatNum && fatNum > 0 ? (tot.folhaBruta / fatNum) * 100 : null;
+
   const detalheCols: Column[] = [
     { key: "funcionario", label: "Funcionário" },
     { key: "funcao", label: "Função" },
@@ -121,18 +154,6 @@ export default function RhPage() {
     { key: "unidade", label: "Unidade" },
     { key: "salarioBruto", label: "Salário Bruto", align: "right", render: (r) => fmtBrl(r.salarioBruto) },
     { key: "beneficios", label: "Benefícios", align: "right", render: (r) => fmtBrl(r.beneficios) },
-    { key: "custoTotal", label: "Custo Total", align: "right", render: (r) => fmtBrl(r.custoTotal) },
-  ];
-  const unidadeCols: Column[] = [
-    { key: "chave", label: "Unidade" },
-    { key: "headcount", label: "Funcionários", align: "right" },
-    { key: "folhaBruta", label: "Folha Bruta", align: "right", render: (r) => fmtBrl(r.folhaBruta) },
-    { key: "custoTotal", label: "Custo Total", align: "right", render: (r) => fmtBrl(r.custoTotal) },
-  ];
-  const setorCols: Column[] = [
-    { key: "chave", label: "Setor" },
-    { key: "headcount", label: "Funcionários", align: "right" },
-    { key: "folhaBruta", label: "Folha Bruta", align: "right", render: (r) => fmtBrl(r.folhaBruta) },
     { key: "custoTotal", label: "Custo Total", align: "right", render: (r) => fmtBrl(r.custoTotal) },
   ];
 
@@ -158,7 +179,7 @@ export default function RhPage() {
         </button>
       </div>
 
-      <div style={{ maxWidth: 320, marginBottom: "1rem" }}>
+      <div style={{ maxWidth: 320, marginBottom: "1.1rem" }}>
         <BodySelect
           label="🏢 Unidade"
           value={unidadeView}
@@ -167,22 +188,92 @@ export default function RhPage() {
         />
       </div>
 
-      <div className="lx-grid" style={{ gridTemplateColumns: "repeat(5, 1fr)" }}>
+      {/* KPIs — valores compactos p/ não quebrar linha */}
+      <div className="lx-grid" style={{ gridTemplateColumns: "repeat(5, minmax(0,1fr))" }}>
         <KpiCard label="👥 Funcionários" value={String(tot.headcount)} color={C.INDIGO} />
-        <KpiCard label="💰 Folha Bruta" value={fmtBrl(tot.folhaBruta)} color={C.BLUE} />
-        <KpiCard label="🧾 Custo Total" value={fmtBrl(tot.custoTotal)} color={C.ORANGE} />
-        <KpiCard label="📊 Salário Médio" value={fmtBrl(tot.salarioMedio)} color={C.PURPLE} />
-        <KpiCard label="🎁 Benefícios" value={fmtBrl(tot.beneficios)} color={C.GREEN} />
+        <KpiCard label="💰 Folha Bruta" value={brCompact(tot.folhaBruta)} color={C.BLUE} sub={fmtBrl(tot.folhaBruta)} subColor="#9CA3AF" />
+        <KpiCard label="🧾 Custo Total" value={brCompact(tot.custoTotal)} color={C.ORANGE} sub={fmtBrl(tot.custoTotal)} subColor="#9CA3AF" />
+        <KpiCard label="📊 Salário Médio" value={brCompact(tot.salarioMedio)} color={C.PURPLE} sub={fmtBrl(tot.salarioMedio)} subColor="#9CA3AF" />
+        <KpiCard label="🎁 Benefícios" value={brCompact(tot.beneficios)} color={C.GREEN} sub={fmtBrl(tot.beneficios)} subColor="#9CA3AF" />
       </div>
 
-      <SecHeader>🏢 Custo por Unidade</SecHeader>
-      <DataTable columns={unidadeCols} rows={porUnidade} maxHeight={360} />
+      {/* Insights automáticos */}
+      <SecHeader>💡 Insights</SecHeader>
+      <div className="lx-grid" style={{ gridTemplateColumns: "repeat(4, minmax(0,1fr))" }}>
+        <InsightCard icon="🏆" title="Setor que mais consome" value={topSetor ? `${topSetor.chave}` : "—"}
+          desc={topSetor ? `${topSetorPct.toFixed(1)}% do custo · ${fmtBrl(topSetor.custoTotal)}` : ""} color={C.ORANGE} />
+        <InsightCard icon="🏢" title="Maior unidade" value={topUnidade ? `${topUnidade.chave}` : "—"}
+          desc={topUnidade ? `${topUnidadePct.toFixed(1)}% do custo · ${topUnidade.headcount} func.` : ""} color={C.INDIGO} />
+        <InsightCard icon="🎁" title="Benefícios / Folha" value={`${benefPctFolha.toFixed(1)}%`}
+          desc={`Benefícios equivalem a ${benefPctFolha.toFixed(1)}% da folha bruta`} color={C.GREEN} />
+        <InsightCard icon="👤" title="Custo médio / func." value={brCompact(custoMedio)}
+          desc={`Custo total ÷ ${tot.headcount} funcionários`} color={C.PURPLE} />
+      </div>
 
-      <SecHeader>🗂️ Custo por Setor</SecHeader>
-      <DataTable columns={setorCols} rows={porSetor} maxHeight={360} />
+      {/* Folha vs Faturamento */}
+      <SecHeader>📐 Folha vs. Faturamento</SecHeader>
+      <div style={{ display: "flex", gap: 16, alignItems: "center", flexWrap: "wrap", background: "#fff", border: "1px solid #EEF0F4", borderRadius: 12, padding: "1rem 1.2rem" }}>
+        <div style={{ maxWidth: 240 }}>
+          <label className="lx-select-label">Faturamento mensal (R$)</label>
+          <input
+            value={faturamento}
+            onChange={(e) => setFaturamento(e.target.value)}
+            placeholder="ex: 1.200.000"
+            inputMode="decimal"
+            className="lx-select"
+            style={{ width: "100%" }}
+          />
+        </div>
+        <div style={{ flex: 1, minWidth: 220 }}>
+          {folhaVsFat == null ? (
+            <div style={{ fontSize: "0.82rem", color: "#9CA3AF" }}>
+              Digite o faturamento do mês para ver quanto a folha de pagamento consome da receita.
+            </div>
+          ) : (
+            <div>
+              <span style={{ fontSize: "2rem", fontWeight: 900, color: folhaVsFat > 40 ? "#EF4444" : folhaVsFat > 30 ? "#F59E0B" : "#00C853" }}>
+                {folhaVsFat.toFixed(1)}%
+              </span>
+              <span style={{ fontSize: "0.85rem", color: "#6B7280", marginLeft: 10 }}>
+                da receita é consumida pela folha bruta ({fmtBrl(tot.folhaBruta)} / {fmtBrl(fatNum!)})
+              </span>
+            </div>
+          )}
+        </div>
+      </div>
 
-      <SecHeader>📋 Detalhe por Funcionário</SecHeader>
-      <DataTable columns={detalheCols} rows={rows} maxHeight={560} />
+      {/* Gráficos */}
+      <div className="lx-grid" style={{ gridTemplateColumns: "repeat(2, minmax(0,1fr))", marginTop: "0.4rem" }}>
+        <div>
+          <SecHeader>🍩 Custo por Setor (%)</SecHeader>
+          <ChartBox><PlotlyChart {...chartCustoPorSetor(porSetor)} /></ChartBox>
+        </div>
+        <div>
+          <SecHeader>🏢 Custo por Unidade</SecHeader>
+          <ChartBox><PlotlyChart {...chartCustoPorUnidade(porUnidade)} /></ChartBox>
+        </div>
+      </div>
+
+      <SecHeader>🧩 Composição do Custo Total</SecHeader>
+      <ChartBox><PlotlyChart {...chartComposicaoCusto(rows)} /></ChartBox>
+
+      {/* Detalhe (recolhido) */}
+      <div style={{ marginTop: "1rem" }}>
+        <Collapsible title={`📋 Detalhe por Funcionário (${rows.length})`} defaultOpen={false}>
+          <DataTable columns={detalheCols} rows={rows} maxHeight={560} />
+        </Collapsible>
+      </div>
     </div>
   );
+}
+
+/** Converte "1.200.000" | "1200000,50" → number, ou null. */
+function brToNumber(v: string): number | null {
+  let s = String(v ?? "").trim();
+  if (!s) return null;
+  s = s.replace(/[R$\s]/g, "");
+  if (s.includes(",")) s = s.replace(/\./g, "").replace(",", ".");
+  else s = s.replace(/\./g, "");
+  const n = Number(s);
+  return Number.isFinite(n) ? n : null;
 }
