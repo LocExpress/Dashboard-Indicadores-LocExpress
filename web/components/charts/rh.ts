@@ -1,6 +1,6 @@
 // Gráficos da aba RH (custo de pessoal).
 import type { PlotlyFigure } from "./PlotlyChartInner";
-import type { RhGrupo, RhRow } from "@/lib/rh";
+import type { RhGrupo, RhRow, RhTotaisResc } from "@/lib/rh";
 
 const CORES = ["#2D3192", "#F47920", "#10B981", "#8B5CF6", "#F59E0B", "#EF4444", "#6366F1", "#0EA5E9", "#EC4899"];
 const BASE_LAYOUT = {
@@ -48,6 +48,47 @@ export function chartCustoPorUnidade(grupos: RhGrupo[]): PlotlyFigure {
     xaxis: { gridcolor: "#F0F0F0", tickprefix: "R$ ", tickformat: ",.0f" },
     yaxis: { automargin: true },
   };
+  return { data, layout };
+}
+
+/** Barras horizontais: passivo de rescisão projetado por setor. */
+export function chartRescisaoPorSetor(grupos: RhGrupo[]): PlotlyFigure {
+  const sorted = [...grupos].filter((g) => g.rescTotal > 0).sort((a, b) => a.rescTotal - b.rescTotal);
+  const data = [{
+    type: "bar",
+    orientation: "h",
+    y: sorted.map((g) => g.chave),
+    x: sorted.map((g) => g.rescTotal),
+    marker: { color: sorted.map((_, i) => CORES[(sorted.length - 1 - i) % CORES.length]) },
+    text: sorted.map((g) => `R$ ${(g.rescTotal / 1000).toLocaleString("pt-BR", { maximumFractionDigits: 1 })} mil`),
+    textposition: "auto",
+    hovertemplate: "<b>%{y}</b><br>R$ %{x:,.0f}<extra></extra>",
+  }];
+  const layout = {
+    ...BASE_LAYOUT,
+    margin: { l: 10, r: 20, t: 20, b: 30 },
+    height: 340,
+    xaxis: { gridcolor: "#F0F0F0", tickprefix: "R$ ", tickformat: ",.0f" },
+    yaxis: { automargin: true },
+  };
+  return { data, layout };
+}
+
+/** Donut: composição do passivo de rescisão (13º, férias, aviso, multa 40%). */
+export function chartRescisaoComponentes(t: RhTotaisResc): PlotlyFigure {
+  const data = [{
+    type: "pie",
+    hole: 0.58,
+    labels: ["Aviso prévio", "Multa 40% FGTS", "Férias + 1/3", "13º proporcional"],
+    values: [t.rescAviso, t.rescMulta40, t.rescFerias, t.resc13],
+    textinfo: "label+percent",
+    textposition: "outside",
+    automargin: true,
+    marker: { colors: ["#EF4444", "#F47920", "#10B981", "#2D3192"], line: { color: "#fff", width: 2 } },
+    hovertemplate: "<b>%{label}</b><br>R$ %{value:,.0f}<br>%{percent}<extra></extra>",
+    sort: false,
+  }];
+  const layout = { ...BASE_LAYOUT, margin: { l: 20, r: 20, t: 20, b: 20 }, height: 340, showlegend: false };
   return { data, layout };
 }
 

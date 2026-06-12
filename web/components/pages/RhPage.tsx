@@ -3,11 +3,11 @@ import { useMemo, useState } from "react";
 import { KpiCard, SecHeader, DataTable, BodySelect, ChartBox, Collapsible, type Column } from "../ui";
 import PlotlyChart from "../charts/PlotlyChart";
 import { fmtBrl } from "@/lib/format";
-import { calcTotais, agrupar, type RhRow } from "@/lib/rh";
-import { chartCustoPorSetor, chartCustoPorUnidade, chartComposicaoCusto } from "../charts/rh";
+import { calcTotais, calcTotaisRescisao, agrupar, type RhRow } from "@/lib/rh";
+import { chartCustoPorSetor, chartCustoPorUnidade, chartComposicaoCusto, chartRescisaoPorSetor, chartRescisaoComponentes } from "../charts/rh";
 
 const C = { INDIGO: "#2D3192", ORANGE: "#F47920", GREEN: "#00C853", BLUE: "#2563EB", PURPLE: "#7C3AED" };
-const SESSION_KEY = "rh_data_v1";
+const SESSION_KEY = "rh_data_v2";
 
 /** R$ compacto p/ caber nos KPIs sem quebrar linha (R$ 233,3 mil). */
 function brCompact(v: number): string {
@@ -43,6 +43,7 @@ export default function RhPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [unidadeView, setUnidadeView] = useState("Todas");
+  const [setorView, setSetorView] = useState("Todos");
   const [faturamento, setFaturamento] = useState("");
 
   async function unlock(e?: React.FormEvent) {
@@ -81,11 +82,18 @@ export default function RhPage() {
     () => (data ? [...new Set(data.map((r) => r.unidade).filter(Boolean))].sort() : []),
     [data],
   );
+  const setores = useMemo(
+    () => (data ? [...new Set(data.map((r) => r.setor).filter(Boolean))].sort() : []),
+    [data],
+  );
   const rows = useMemo(
-    () => (data ? (unidadeView === "Todas" ? data : data.filter((r) => r.unidade === unidadeView)) : []),
-    [data, unidadeView],
+    () => (data ?? []).filter(
+      (r) => (unidadeView === "Todas" || r.unidade === unidadeView) && (setorView === "Todos" || r.setor === setorView),
+    ),
+    [data, unidadeView, setorView],
   );
   const tot = useMemo(() => calcTotais(rows), [rows]);
+  const totResc = useMemo(() => calcTotaisRescisao(rows), [rows]);
   const porUnidade = useMemo(() => agrupar(rows, "unidade"), [rows]);
   const porSetor = useMemo(() => agrupar(rows, "setor"), [rows]);
 
@@ -155,6 +163,7 @@ export default function RhPage() {
     { key: "salarioBruto", label: "Salário Bruto", align: "right", render: (r) => fmtBrl(r.salarioBruto) },
     { key: "beneficios", label: "Benefícios", align: "right", render: (r) => fmtBrl(r.beneficios) },
     { key: "custoTotal", label: "Custo Total", align: "right", render: (r) => fmtBrl(r.custoTotal) },
+    { key: "rescTotal", label: "Rescisão (hoje)", align: "right", render: (r) => (r.rescTotal ? fmtBrl(r.rescTotal) : "—") },
   ];
 
   return (
@@ -179,12 +188,18 @@ export default function RhPage() {
         </button>
       </div>
 
-      <div style={{ maxWidth: 320, marginBottom: "1.1rem" }}>
+      <div className="lx-grid" style={{ gridTemplateColumns: "repeat(2, minmax(0,320px))", marginBottom: "1.1rem" }}>
         <BodySelect
           label="🏢 Unidade"
           value={unidadeView}
           onChange={setUnidadeView}
           options={[{ value: "Todas", label: "Todas" }, ...unidades.map((u) => ({ value: u, label: u }))]}
+        />
+        <BodySelect
+          label="🗂️ Setor"
+          value={setorView}
+          onChange={setSetorView}
+          options={[{ value: "Todos", label: "Todos" }, ...setores.map((s) => ({ value: s, label: s }))]}
         />
       </div>
 
@@ -256,6 +271,31 @@ export default function RhPage() {
 
       <SecHeader>🧩 Composição do Custo Total</SecHeader>
       <ChartBox><PlotlyChart {...chartComposicaoCusto(rows)} /></ChartBox>
+
+      {/* Projeção de rescisão */}
+      <SecHeader>💼 Projeção de Rescisão — cenário “demitir hoje”</SecHeader>
+      <div style={{ fontSize: "0.76rem", color: "#6B7280", margin: "-2px 0 8px", lineHeight: 1.5 }}>
+        Passivo trabalhista estimado se os <strong>{totResc.qtdAtivos}</strong> funcionários ativos fossem desligados sem justa causa hoje.
+        Cálculo por tempo de casa: <strong>13º</strong> e <strong>férias+⅓</strong> proporcionais, <strong>aviso prévio</strong> (30 + 3 dias/ano, máx 90)
+        e <strong>multa 40%</strong> sobre o FGTS acumulado (8% × salário × meses). Estimativa — não considera férias vencidas não gozadas.
+      </div>
+      <div className="lx-grid" style={{ gridTemplateColumns: "repeat(5, minmax(0,1fr))" }}>
+        <KpiCard label="🎄 13º Proporcional" value={brCompact(totResc.resc13)} color={C.INDIGO} sub={fmtBrl(totResc.resc13)} subColor="#9CA3AF" />
+        <KpiCard label="🏖️ Férias + ⅓" value={brCompact(totResc.rescFerias)} color={C.GREEN} sub={fmtBrl(totResc.rescFerias)} subColor="#9CA3AF" />
+        <KpiCard label="📄 Aviso Prévio" value={brCompact(totResc.rescAviso)} color={C.BLUE} sub={fmtBrl(totResc.rescAviso)} subColor="#9CA3AF" />
+        <KpiCard label="⚖️ Multa 40% FGTS" value={brCompact(totResc.rescMulta40)} color={C.ORANGE} sub={fmtBrl(totResc.rescMulta40)} subColor="#9CA3AF" />
+        <KpiCard label="💼 Passivo Total" value={brCompact(totResc.rescTotal)} color="#EF4444" sub={fmtBrl(totResc.rescTotal)} subColor="#9CA3AF" />
+      </div>
+      <div className="lx-grid" style={{ gridTemplateColumns: "repeat(2, minmax(0,1fr))", marginTop: "0.4rem" }}>
+        <div>
+          <SecHeader>🏢 Custo de Rescisão por Setor</SecHeader>
+          <ChartBox><PlotlyChart {...chartRescisaoPorSetor(porSetor)} /></ChartBox>
+        </div>
+        <div>
+          <SecHeader>📊 Composição do Passivo</SecHeader>
+          <ChartBox><PlotlyChart {...chartRescisaoComponentes(totResc)} /></ChartBox>
+        </div>
+      </div>
 
       {/* Detalhe (recolhido) */}
       <div style={{ marginTop: "1rem" }}>
