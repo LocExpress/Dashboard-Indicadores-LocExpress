@@ -278,6 +278,7 @@ export default function RhPage() {
         Passivo trabalhista estimado se os <strong>{totResc.qtdAtivos}</strong> funcionários ativos fossem desligados sem justa causa hoje.
         Cálculo por tempo de casa: <strong>13º</strong> e <strong>férias+⅓</strong> proporcionais, <strong>aviso prévio</strong> (30 + 3 dias/ano, máx 90)
         e <strong>multa 40%</strong> sobre o FGTS acumulado (8% × salário × meses). Estimativa — não considera férias vencidas não gozadas.
+        Se a planilha tiver as colunas de rescisão preenchidas, <strong>os valores dela têm prioridade</strong> sobre o cálculo.
       </div>
       <div className="lx-grid" style={{ gridTemplateColumns: "repeat(5, minmax(0,1fr))" }}>
         <KpiCard label="🎄 13º Proporcional" value={brCompact(totResc.resc13)} color={C.INDIGO} sub={fmtBrl(totResc.resc13)} subColor="#9CA3AF" />

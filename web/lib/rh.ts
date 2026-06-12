@@ -157,8 +157,22 @@ export function parseRh(raw: CsvRow[]): RhRow[] {
   const kFgts = find("CUSTO FGTS");
   const kTotal = find("CUSTO TOTAL");
 
+  // Colunas opcionais de rescisão na planilha (sobrescrevem o cálculo quando preenchidas).
+  const kResc13 = find("RESCISAO 13", "RESC 13");
+  const kRescFerias = find("RESCISAO FERIAS", "RESC FERIAS");
+  const kRescAviso = find("RESCISAO AVISO", "AVISO PREVIO", "AVISO");
+  const kRescMulta = find("RESCISAO MULTA", "MULTA 40", "MULTA");
+
   const str = (r: CsvRow, k: string | null) => (k ? String(r[k] ?? "").trim() : "");
   const num = (r: CsvRow, k: string | null) => (k ? brMoney(r[k]) : 0);
+  // Usa o valor da planilha se a célula estiver preenchida; senão, o calculado.
+  const override = (r: CsvRow, k: string | null, calc: number) => {
+    if (k) {
+      const s = String(r[k] ?? "").trim();
+      if (s !== "" && s !== "-" && s !== "—") return brMoney(s);
+    }
+    return calc;
+  };
 
   const out: RhRow[] = [];
   for (const r of raw) {
@@ -178,9 +192,16 @@ export function parseRh(raw: CsvRow[]): RhRow[] {
     const mesesCasa = admissao ? mesesEntre(admissao, hoje) : Math.round(num(r, kTempo) * 12);
 
     const ativo = norm(situacao) === "ATIVO";
-    const resc = ativo
+    const calc = ativo
       ? calcRescisao(salarioBruto, admissao, hoje)
       : { meses: mesesCasa, resc13: 0, rescFerias: 0, rescAviso: 0, rescMulta40: 0, total: 0 };
+
+    // planilha tem prioridade; cálculo é fallback por componente
+    const resc13 = override(r, kResc13, calc.resc13);
+    const rescFerias = override(r, kRescFerias, calc.rescFerias);
+    const rescAviso = override(r, kRescAviso, calc.rescAviso);
+    const rescMulta40 = override(r, kRescMulta, calc.rescMulta40);
+    const rescTotal = resc13 + rescFerias + rescAviso + rescMulta40;
 
     out.push({
       unidade: str(r, kUnidade),
@@ -206,11 +227,11 @@ export function parseRh(raw: CsvRow[]): RhRow[] {
       custoTotal: num(r, kTotal),
       beneficios: planoSaude + valeAlimentacao + seguroVida + auxilioCombustivel + vt,
       ativo,
-      resc13: resc.resc13,
-      rescFerias: resc.rescFerias,
-      rescAviso: resc.rescAviso,
-      rescMulta40: resc.rescMulta40,
-      rescTotal: resc.total,
+      resc13,
+      rescFerias,
+      rescAviso,
+      rescMulta40,
+      rescTotal,
     });
   }
   return out;
