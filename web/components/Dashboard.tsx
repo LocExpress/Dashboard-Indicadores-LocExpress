@@ -14,6 +14,7 @@ import SgePage from "./pages/SgePage";
 import OrcamentoPage from "./pages/OrcamentoPage";
 import Marketing from "./pages/Marketing";
 import GoogleAnalytics from "./pages/GoogleAnalytics";
+import RhPage from "./pages/RhPage";
 
 const TABS = [
   { id: "geral", label: "📊  Visão Geral", sidebar: true },
@@ -22,6 +23,7 @@ const TABS = [
   { id: "orc", label: "💰  Orçamento", sidebar: false },
   { id: "mkt", label: "📣  Marketing", sidebar: false },
   { id: "analytics", label: "📈  Portal do Franqueado", sidebar: false },
+  { id: "rh", label: "👥  RH", sidebar: false },
 ] as const;
 
 type TabId = (typeof TABS)[number]["id"];
@@ -105,6 +107,8 @@ export default function Dashboard() {
         return <Marketing />;
       case "analytics":
         return <GoogleAnalytics />;
+      case "rh":
+        return <RhPage />;
     }
   })();
 
