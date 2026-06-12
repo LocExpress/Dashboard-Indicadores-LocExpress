@@ -790,30 +790,77 @@ function renderPosts() {
   });
 }
 
-// ─── Metas de Marketing (Planilha de Indicadores — Setor Marketing) ───
-const METAS_MKT = {
-  seguidores: [
-    {mes:'Jan/26', meta:6000,  real:6030},
-    {mes:'Fev/26', meta:6200,  real:6300},
-    {mes:'Mar/26', meta:6500,  real:6700},
-    {mes:'Abr/26', meta:6900,  real:6955},
-  ],
-  curtidas: [
-    {mes:'Jan/26', meta:1100,  real:1112},
-    {mes:'Fev/26', meta:1100,  real:1310},
-    {mes:'Mar/26', meta:1100,  real:1789},
-    {mes:'Abr/26', meta:1100,  real:1515},
-  ],
-  campanhas: {meta:1,  real:3,  label:'Campanhas lançadas · Abr/26'},
-  aderencia: {meta:82, real:62, label:'Aderência ao SGE (%) · Abr/26'},
+// ─── Metas de Marketing — puxado AO VIVO da Planilha de Indicadores (Setor Marketing) ───
+const MKT_SHEET_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vS2xFh5eXX8nGh042OkHSK9hQAjBD88kxkbCzHv0WjFp41hR5xEE9L2KM60MtRMyPf_znK13bHbwADx/pub?gid=0&single=true&output=csv";
+let METAS_MKT = {
+  seguidores: [], curtidas: [],
+  campanhas: {meta:null, real:null, label:'Campanhas lançadas'},
+  aderencia: {meta:null, real:null, label:'Aderência ao SGE (%)'},
 };
+const _MESES_ABBR = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+const _noAccent = s => String(s||'').normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase().trim();
+function _csvRows(text){
+  return text.split(/\r?\n/).filter(l => l.length).map(line => {
+    const out=[]; let cur=''; let q=false;
+    for(let i=0;i<line.length;i++){
+      const ch=line[i];
+      if(ch==='"'){ if(q && line[i+1]==='"'){cur+='"'; i++;} else q=!q; }
+      else if(ch===',' && !q){ out.push(cur); cur=''; }
+      else cur+=ch;
+    }
+    out.push(cur); return out;
+  });
+}
+function _numBR(v){
+  let s=String(v==null?'':v).replace(/[R$%\s]/g,'').trim();
+  if(!s || s==='-') return null;
+  if(s.includes(',')) s=s.replace(/\./g,'').replace(',','.'); else s=s.replace(/\./g,'');
+  const n=Number(s); return Number.isFinite(n)?n:null;
+}
+function _mesInfo(data){
+  const m=String(data||'').trim().match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{2,4})/);
+  if(!m) return null;
+  const mo=+m[2]; if(mo<1||mo>12) return null;
+  const yyyy = m[3].length===4 ? m[3] : ('20'+m[3]);
+  return { key:`${yyyy}-${String(mo).padStart(2,'0')}`, label:`${_MESES_ABBR[mo-1]}/${yyyy.slice(-2)}` };
+}
+async function loadMetas(){
+  const res = await fetch(MKT_SHEET_URL, {cache:'no-store'});
+  if(!res.ok) throw new Error('HTTP '+res.status);
+  const rows = _csvRows(await res.text());
+  if(rows.length < 2) throw new Error('CSV vazio');
+  const hdr = rows[0].map(_noAccent);
+  const cData=hdr.indexOf('data'), cSetor=hdr.indexOf('setor'),
+        cInd=hdr.indexOf('indicador'), cMeta=hdr.indexOf('meta'), cValor=hdr.indexOf('valor');
+  const seg={}, cur={}, camp={}, ader={};
+  for(let i=1;i<rows.length;i++){
+    const r=rows[i];
+    if(_noAccent(r[cSetor]) !== 'marketing') continue;
+    const ind=_noAccent(r[cInd]);
+    const mi=_mesInfo(r[cData]);
+    const meta=_numBR(r[cMeta]), real=_numBR(r[cValor]);
+    if(meta==null && real==null) continue;
+    if(ind.includes('seguidores') && mi)      seg[mi.key]={mes:mi.label, meta:meta??0, real:real??0, key:mi.key};
+    else if(ind.includes('curtidas') && mi)   cur[mi.key]={mes:mi.label, meta:meta??0, real:real??0, key:mi.key};
+    else if(ind.includes('campanhas lancadas') && mi) camp[mi.key]={meta, real, key:mi.key, label:`Campanhas lançadas · ${mi.label}`};
+    else if(ind.includes('aderencia ao sistema de gestao') && mi) ader[mi.key]={meta, real, key:mi.key, label:`Aderência ao SGE (%) · ${mi.label}`};
+  }
+  const sortVals = o => Object.values(o).sort((a,b)=> a.key<b.key?-1:1);
+  const latest   = o => { const a=sortVals(o); return a.length ? a[a.length-1] : null; };
+  METAS_MKT.seguidores = sortVals(seg);
+  METAS_MKT.curtidas   = sortVals(cur);
+  const lc=latest(camp); if(lc) METAS_MKT.campanhas={meta:lc.meta, real:lc.real, label:lc.label};
+  const la=latest(ader); if(la) METAS_MKT.aderencia={meta:la.meta, real:la.real, label:la.label};
+}
 
 function _metaStatus(real, meta) {
+  if(real==null) return 'warn';
   if(!meta) return 'warn';
   const pct = real / meta * 100;
   return pct >= 100 ? 'ok' : pct >= 80 ? 'warn' : 'fail';
 }
 function _metaPill(real, meta) {
+  if(real==null) return '— sem dado no mês';
   if(!meta) return '— sem meta';
   const pct = real / meta * 100;
   const icon = pct >= 100 ? '✅' : pct >= 80 ? '⚠️' : '❌';
@@ -821,12 +868,12 @@ function _metaPill(real, meta) {
 }
 
 function renderMetas() {
-  const segLast  = METAS_MKT.seguidores[METAS_MKT.seguidores.length-1];
-  const curtLast = METAS_MKT.curtidas[METAS_MKT.curtidas.length-1];
+  const segLast  = METAS_MKT.seguidores[METAS_MKT.seguidores.length-1] || {real:null, meta:null};
+  const curtLast = METAS_MKT.curtidas[METAS_MKT.curtidas.length-1]     || {real:null, meta:null};
 
   const cards = [
-    {label:'Seguidores · Abr/26',         real:segLast.real,           meta:segLast.meta,           display: v=>fmt(v)},
-    {label:'Curtidas mensais · Abr/26',   real:curtLast.real,          meta:curtLast.meta,          display: v=>fmt(v)},
+    {label:`Seguidores · ${segLast.mes || '—'}`,        real:segLast.real,           meta:segLast.meta,           display: v=>fmt(v)},
+    {label:`Curtidas mensais · ${curtLast.mes || '—'}`, real:curtLast.real,          meta:curtLast.meta,          display: v=>fmt(v)},
     {label:METAS_MKT.campanhas.label,     real:METAS_MKT.campanhas.real, meta:METAS_MKT.campanhas.meta, display: v=>`${v} campanha${v!==1?'s':''}`},
     {label:METAS_MKT.aderencia.label,     real:METAS_MKT.aderencia.real, meta:METAS_MKT.aderencia.meta, display: v=>`${v}%`},
   ];
@@ -839,8 +886,8 @@ function renderMetas() {
     grid.innerHTML += `
       <div class="meta-card ${st}">
         <div class="meta-label">${c.label}</div>
-        <div class="meta-real ${st}">${c.display(c.real)}</div>
-        <div class="meta-sub">Meta: <strong style="color:var(--text)">${c.display(c.meta)}</strong></div>
+        <div class="meta-real ${st}">${c.real==null ? '—' : c.display(c.real)}</div>
+        <div class="meta-sub">Meta: <strong style="color:var(--text)">${c.meta==null ? '—' : c.display(c.meta)}</strong></div>
         <div class="meta-pill ${st}">${pill}</div>
       </div>`;
   });
@@ -884,7 +931,11 @@ buildSelects();
 initCharts();
 renderPosts();
 applyFilter();
-renderMetas();
+loadMetas().then(renderMetas).catch(err => {
+  console.error('Metas Marketing:', err);
+  const g = document.getElementById('metaKpiGrid');
+  if (g) g.innerHTML = '<div style="grid-column:1/-1;color:#9ca3af;font-size:13px;padding:8px">⚠️ Não foi possível carregar as metas da planilha de indicadores.</div>';
+});
 </script>
 </body>
 </html>
