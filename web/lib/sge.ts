@@ -2,7 +2,7 @@
 import { fetchCsvRows, type CsvRow } from "./data";
 
 export const SGE_GERAL_URL =
-  "https://docs.google.com/spreadsheets/d/e/2PACX-1vR7vqbGSRITRkAikpISxGrIyAXSVr2HZllFSiYhIBIcye5_PsrTcGVAs1THfIyhqw/pub?gid=225370926&single=true&output=csv";
+  "https://docs.google.com/spreadsheets/d/e/2PACX-1vR7vqbGSRITRkAikpISxGrIyAXSVr2HZllFSiYhIBIcye5_PsrTcGVAs1THfIyhqw/pub?output=csv";
 
 export const SGE_COLORS = {
   BLUE: "#2D3192",
@@ -159,16 +159,85 @@ export interface LoadSgeResult {
   error: string | null;
 }
 
+// --- Pivot-format parser (new sheet: months as columns) ---
+
+const SETORES_PIVOT = ["IMP.", "PER.", "COM.", "MKT.", "DP/RH", "FIN.", "ADM."];
+const MESES_NORM = MESES_SGE.map((m) =>
+  m.normalize("NFD").replace(/[̀-ͯ]/g, "").toUpperCase()
+);
+
+function splitCsvLine(line: string): string[] {
+  const cols: string[] = [];
+  let cur = "";
+  let inQ = false;
+  for (const ch of line) {
+    if (ch === '"') { inQ = !inQ; continue; }
+    if (ch === "," && !inQ) { cols.push(cur.trim()); cur = ""; }
+    else cur += ch;
+  }
+  cols.push(cur.trim());
+  return cols;
+}
+
+function parseSgePivot(text: string): SgeRow[] {
+  const rows = text.split(/\r?\n/).map(splitCsvLine);
+  const ano = new Date().getFullYear();
+
+  // Find the row that contains month names (JANEIRO, FEVEREIRO …)
+  let monthRowIdx = -1;
+  const monthCols: { mes: number; startCol: number }[] = [];
+  for (let ri = 0; ri < Math.min(rows.length, 8); ri++) {
+    const normed = rows[ri].map((c) =>
+      c.normalize("NFD").replace(/[̀-ͯ]/g, "").toUpperCase().trim()
+    );
+    if (normed.some((c) => MESES_NORM.includes(c))) {
+      monthRowIdx = ri;
+      for (let ci = 0; ci < normed.length; ci++) {
+        const mi = MESES_NORM.indexOf(normed[ci]);
+        if (mi >= 0) monthCols.push({ mes: mi + 1, startCol: ci });
+      }
+      break;
+    }
+  }
+  if (monthRowIdx === -1 || monthCols.length === 0) return [];
+
+  // Data rows start 2 rows after the month header
+  const out: SgeRow[] = [];
+  for (let ri = monthRowIdx + 2; ri < rows.length; ri++) {
+    const row = rows[ri];
+    const itemNum = (row[1] ?? "").trim();
+    const assunto = (row[2] ?? "").trim();
+    if (!assunto || !/^\d+$/.test(itemNum)) continue;
+
+    for (const { mes, startCol } of monthCols) {
+      for (let d = 0; d < SETORES_PIVOT.length; d++) {
+        const ci = startCol + d;
+        const raw = ci < row.length ? row[ci] : "";
+        const pontos = parseScore(raw);
+        out.push({
+          ANO: ano,
+          MES: mes,
+          SETOR: SETORES_PIVOT[d],
+          ASSUNTO: assunto,
+          PONTOS: pontos,
+          AVALIADO: pontos !== null,
+          MAXIMO: 5,
+        });
+      }
+    }
+  }
+  return out;
+}
+
 export async function loadSge(): Promise<LoadSgeResult> {
-  let raw: CsvRow[];
   try {
-    raw = await fetchCsvRows(SGE_GERAL_URL);
+    const res = await fetch(SGE_GERAL_URL, { cache: "no-store" });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const text = await res.text();
+    const parsed = parseSgePivot(text);
+    if (parsed.length === 0) return { data: null, error: "Nenhum dado encontrado na planilha." };
+    return { data: parsed, error: null };
   } catch (e) {
     return { data: null, error: String(e) };
   }
-  if (raw.length === 0 || Object.keys(raw[0]).length < 3) {
-    return { data: null, error: "Planilha vazia ou sem colunas suficientes." };
-  }
-  const parsed = parseSge(raw);
-  return { data: parsed, error: null };
 }
