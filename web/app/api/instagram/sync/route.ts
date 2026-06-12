@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getAllPages, getIGProfile, getIGInsights, getIGPosts, getPostInsights } from "@/lib/instagram/meta";
+import { getAllPages, getIGProfile, getIGInsights, getIGPosts } from "@/lib/instagram/meta";
 import { sbUpsert } from "@/lib/instagram/db";
 
 export async function POST() {
@@ -8,13 +8,12 @@ export async function POST() {
 
   const today = new Date().toISOString().slice(0, 10);
   const now = new Date().toISOString();
-  const results = { synced: 0, pending: 0, errors: [] as string[] };
 
   try {
     const pages = await getAllPages(userToken);
+    console.log(`[Sync] ${pages.length} páginas encontradas`);
 
-    for (const page of pages) {
-      const igAccount = page.instagram_business_account;
+    const settled = await Promise.allSettled(pages.map(async (page) => {
       const base = {
         page_id: page.id,
         page_name: page.name,
@@ -24,14 +23,23 @@ export async function POST() {
         updated_at: now,
       };
 
+      const igAccount = page.instagram_business_account;
       if (!igAccount?.id) {
         await sbUpsert("franquias_instagram", { ...base, status_conexao: "sem_instagram" }, "page_id");
-        results.pending++;
-        continue;
+        return "pending";
       }
 
       try {
-        const profile = await getIGProfile(igAccount.id, page.access_token);
+        // Fetch profile, insights and posts in parallel per page
+        const [profileRes, insightsRes, postsRes] = await Promise.allSettled([
+          getIGProfile(igAccount.id, page.access_token),
+          getIGInsights(igAccount.id, page.access_token),
+          getIGPosts(igAccount.id, page.access_token),
+        ]);
+
+        if (profileRes.status === "rejected") throw profileRes.reason;
+        const profile = profileRes.value;
+
         const franquia = await sbUpsert("franquias_instagram", {
           ...base,
           instagram_username: profile.username,
@@ -40,67 +48,59 @@ export async function POST() {
           erro_api: null,
         }, "page_id");
 
-        if (!franquia?.id) continue;
+        if (!franquia?.id) return "synced";
 
-        const insights = await getIGInsights(igAccount.id, page.access_token);
-        await sbUpsert("instagram_daily_metrics", {
-          franquia_instagram_id: franquia.id,
-          data: today,
-          followers_count: profile.followers_count ?? 0,
-          follows_count: profile.follows_count ?? 0,
-          media_count: profile.media_count ?? 0,
-          reach: insights.reach ?? 0,
-          profile_views: insights.profile_views ?? 0,
-          website_clicks: insights.website_clicks ?? 0,
-          accounts_engaged: insights.accounts_engaged ?? 0,
-          total_interactions: insights.total_interactions ?? 0,
-        }, "franquia_instagram_id,data");
+        const insights = insightsRes.status === "fulfilled" ? insightsRes.value : {};
+        const posts = postsRes.status === "fulfilled" ? postsRes.value : [];
 
-        const posts = await getIGPosts(igAccount.id, page.access_token);
-        for (const post of posts) {
-          const saved = await sbUpsert("instagram_posts", {
+        // Upsert daily metrics + all posts in parallel
+        await Promise.allSettled([
+          sbUpsert("instagram_daily_metrics", {
             franquia_instagram_id: franquia.id,
-            ig_media_id: post.id,
-            caption: post.caption ?? null,
-            media_type: post.media_type,
-            media_product_type: post.media_product_type ?? null,
-            permalink: post.permalink,
-            timestamp: post.timestamp,
-            like_count: post.like_count ?? 0,
-            comments_count: post.comments_count ?? 0,
-          }, "ig_media_id");
+            data: today,
+            followers_count: profile.followers_count ?? 0,
+            follows_count: profile.follows_count ?? 0,
+            media_count: profile.media_count ?? 0,
+            reach: insights.reach ?? 0,
+            profile_views: insights.profile_views ?? 0,
+            website_clicks: insights.website_clicks ?? 0,
+            accounts_engaged: insights.accounts_engaged ?? 0,
+            total_interactions: insights.total_interactions ?? 0,
+          }, "franquia_instagram_id,data"),
+          ...posts.map((post: any) =>
+            sbUpsert("instagram_posts", {
+              franquia_instagram_id: franquia.id,
+              ig_media_id: post.id,
+              caption: post.caption ?? null,
+              media_type: post.media_type,
+              media_product_type: post.media_product_type ?? null,
+              permalink: post.permalink,
+              timestamp: post.timestamp,
+              like_count: post.like_count ?? 0,
+              comments_count: post.comments_count ?? 0,
+            }, "ig_media_id")
+          ),
+        ]);
 
-          if (saved?.id) {
-            const ins = await getPostInsights(post.id, page.access_token);
-            if (Object.keys(ins).length > 0) {
-              const followers = profile.followers_count || 1;
-              await sbUpsert("instagram_post_insights", {
-                post_id: saved.id,
-                data_coleta: today,
-                reach: ins.reach ?? 0,
-                likes: ins.likes ?? 0,
-                comments: ins.comments ?? 0,
-                shares: ins.shares ?? 0,
-                saved: ins.saved ?? 0,
-                total_interactions: ins.total_interactions ?? 0,
-                engagement_rate: (ins.total_interactions ?? 0) / followers,
-              }, "post_id,data_coleta");
-            }
-          }
-        }
-
-        results.synced++;
+        return "synced";
       } catch (e: any) {
         await sbUpsert("franquias_instagram", {
           ...base,
           status_conexao: "sem_permissao",
           erro_api: e.message,
         }, "page_id");
-        results.errors.push(`${page.name}: ${e.message}`);
+        return `error:${page.name}: ${e.message}`;
       }
-    }
+    }));
 
-    return NextResponse.json({ success: true, ...results });
+    const synced = settled.filter(r => r.status === "fulfilled" && r.value === "synced").length;
+    const pending = settled.filter(r => r.status === "fulfilled" && r.value === "pending").length;
+    const errors = settled
+      .filter(r => r.status === "rejected" || (r.status === "fulfilled" && String(r.value).startsWith("error:")))
+      .map(r => r.status === "rejected" ? String(r.reason) : String((r as any).value).replace("error:", ""));
+
+    console.log(`[Sync] done: ${synced} sync, ${pending} pending, ${errors.length} errors`);
+    return NextResponse.json({ success: true, total: pages.length, synced, pending, errors });
   } catch (err: any) {
     console.error("[Instagram Sync]", err);
     return NextResponse.json({ error: err.message }, { status: 500 });
