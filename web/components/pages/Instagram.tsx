@@ -127,7 +127,10 @@ export default function Instagram() {
     setSyncing(true); setSyncResult(null);
     try {
       const res = await fetch("/api/instagram/sync", { method: "POST" });
-      const data = await res.json();
+      const text = await res.text();
+      let data: any;
+      try { data = JSON.parse(text); }
+      catch { throw new Error(`Servidor retornou (${res.status}): ${text.slice(0, 300)}`); }
       if (data.error) throw new Error(data.error);
       setSyncResult(`✅ ${data.synced} conectadas, ${data.pending} pendentes${data.errors?.length ? `, ${data.errors.length} erros` : ""}`);
       await loadDashboard();
