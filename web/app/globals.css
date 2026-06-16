@@ -219,3 +219,50 @@ html, body {
 .viab-panel-title { font-size:0.95rem; font-weight:700; color:#1f2440; }
 .viab-panel-sub { font-size:0.73rem; color:#9097a8; margin-top:1px; }
 .viab-panel.span-2 { grid-column:1 / -1; }
+
+/* ════════════════════════════════════════════════════════════════════════
+   Navegação por ÁREAS (executivo)
+   ════════════════════════════════════════════════════════════════════════ */
+.area-bar { display:flex; align-items:center; gap:0.8rem; flex-wrap:wrap; background:#fff; border:1px solid #edeef3; border-radius:14px;
+  padding:0.55rem 0.7rem; box-shadow:0 1px 3px rgba(16,24,40,.06); margin-bottom:1.2rem; }
+.area-tabs { display:flex; gap:4px; flex-wrap:wrap; flex:1; }
+.area-tab { display:flex; align-items:center; gap:8px; border:none; background:transparent; color:#5b6472; font-weight:700; font-size:0.92rem;
+  padding:0.6rem 1.1rem; border-radius:10px; cursor:pointer; transition:background .15s, color .15s, box-shadow .15s; }
+.area-tab:hover { background:#f3f4fa; color:#2f3192; }
+.area-tab.active { background:linear-gradient(135deg,#2f3192 0%,#3f42b8 100%); color:#fff; box-shadow:0 3px 10px rgba(47,49,146,.3); }
+.area-refresh { display:flex; align-items:center; gap:7px; border:1.5px solid #e2e5ee; background:#fff; color:#2f3192; font-weight:700; font-size:0.82rem;
+  padding:0.5rem 0.95rem; border-radius:10px; cursor:pointer; transition:border-color .15s, box-shadow .15s; }
+.area-refresh:hover { border-color:#2f3192; box-shadow:0 0 0 3px rgba(47,49,146,.1); }
+
+/* Hero da área */
+.area-hero { display:flex; align-items:center; gap:1rem; margin-bottom:1.1rem; }
+.area-hero-icon { width:54px; height:54px; border-radius:14px; display:flex; align-items:center; justify-content:center; flex:none;
+  background:linear-gradient(135deg,#2f3192,#f5781c); color:#fff; box-shadow:0 6px 18px rgba(47,49,146,.25); }
+.area-hero h2 { font-size:1.4rem; font-weight:800; color:#1f2440; margin:0; letter-spacing:-0.02em; }
+.area-hero p { font-size:0.85rem; color:#8a90a2; margin:2px 0 0; }
+
+/* Cards de drill-in */
+.area-drill { display:grid; grid-template-columns:repeat(auto-fit,minmax(260px,1fr)); gap:1rem; margin-top:0.4rem; }
+.area-drill-card { display:flex; align-items:center; gap:0.9rem; text-align:left; background:#fff; border:1px solid #edeef3; border-radius:14px;
+  padding:1.1rem 1.2rem; box-shadow:0 1px 3px rgba(16,24,40,.06); cursor:pointer; transition:transform .15s, box-shadow .15s, border-color .15s; width:100%; }
+.area-drill-card:hover { transform:translateY(-2px); box-shadow:0 10px 26px rgba(16,24,40,.1); border-color:#d7daec; }
+.area-drill-ic { width:44px; height:44px; border-radius:12px; display:flex; align-items:center; justify-content:center; flex:none; background:#eef0fb; color:#2f3192; }
+.area-drill-tt { font-size:1rem; font-weight:700; color:#1f2440; }
+.area-drill-sub { font-size:0.76rem; color:#9097a8; margin-top:1px; }
+.area-drill-arrow { margin-left:auto; color:#c2c6d8; flex:none; }
+.area-drill-card:hover .area-drill-arrow { color:#f5781c; }
+
+/* Subnav dentro da área */
+.area-subnav { display:flex; align-items:center; gap:0.7rem; flex-wrap:wrap; margin-bottom:1rem; }
+.area-back { display:inline-flex; align-items:center; gap:6px; border:none; background:#eceef3; color:#5b6472; font-weight:700; font-size:0.82rem;
+  padding:0.48rem 0.85rem; border-radius:9px; cursor:pointer; transition:background .15s,color .15s; }
+.area-back:hover { background:#e2e5ee; color:#2f3192; }
+
+/* Barra de filtros no topo (slicers de indicadores) */
+.filt-bar { display:flex; flex-wrap:wrap; gap:1rem 1.4rem; align-items:flex-start; background:#fff; border:1px solid #edeef3; border-radius:14px;
+  padding:0.95rem 1.2rem; box-shadow:0 1px 3px rgba(16,24,40,.06); margin-bottom:1.1rem; }
+.filt-item { min-width:170px; flex:1 1 170px; }
+.filt-label { font-size:0.64rem; font-weight:700; letter-spacing:0.09em; text-transform:uppercase; color:#8a90a2; margin-bottom:0.35rem; display:flex; align-items:center; gap:5px; }
+
+/* section title de overview */
+.area-sec { font-size:0.7rem; font-weight:800; letter-spacing:0.1em; text-transform:uppercase; color:#8a90a2; margin:1.4rem 0 0.7rem; }

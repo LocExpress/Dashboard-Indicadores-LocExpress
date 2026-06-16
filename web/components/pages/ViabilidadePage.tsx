@@ -1,6 +1,8 @@
 "use client";
-import { useState, type ReactNode, type CSSProperties } from "react";
+import { useState, type ReactNode } from "react";
 import { DataTable, type Column } from "../ui";
+import { Icon } from "../Icon";
+import { Kpi } from "../Kpi";
 import PlotlyChart from "../charts/PlotlyChart";
 import {
   chartFluxoCaixaAcumulado, chartFaturamento, chartLucratividade, chartRentabilidade,
@@ -25,40 +27,6 @@ const SUBTABS = [
 type SubId = (typeof SUBTABS)[number]["id"];
 
 const ANO_COLS: Column[] = ANOS.map((a, i) => ({ key: `a${i}`, label: a, align: "right" as const }));
-
-// ─── Ícones (SVG inline, sem dependência) ──────────────────────────────────
-function Icon({ name, size = 18 }: { name: string; size?: number }) {
-  const common = { width: size, height: size, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: 2, strokeLinecap: "round" as const, strokeLinejoin: "round" as const };
-  const paths: Record<string, ReactNode> = {
-    trendingUp: <><polyline points="22 7 13.5 15.5 8.5 10.5 2 17" /><polyline points="16 7 22 7 22 13" /></>,
-    percent: <><line x1="19" y1="5" x2="5" y2="19" /><circle cx="6.5" cy="6.5" r="2.5" /><circle cx="17.5" cy="17.5" r="2.5" /></>,
-    clock: <><circle cx="12" cy="12" r="9" /><polyline points="12 7 12 12 15.5 14" /></>,
-    refresh: <><polyline points="21 3 21 9 15 9" /><path d="M21 9a9 9 0 1 0-2.6 6.4" /></>,
-    wallet: <><path d="M3 7a2 2 0 0 1 2-2h13a1 1 0 0 1 1 1v2" /><path d="M3 7v10a2 2 0 0 0 2 2h14a1 1 0 0 0 1-1v-3" /><path d="M16 13a2 2 0 0 0 0 4h5v-4z" /></>,
-    layers: <><polygon points="12 2 22 8.5 12 15 2 8.5 12 2" /><polyline points="2 15.5 12 22 22 15.5" /></>,
-    grid: <><rect x="3" y="3" width="7" height="7" rx="1" /><rect x="14" y="3" width="7" height="7" rx="1" /><rect x="3" y="14" width="7" height="7" rx="1" /><rect x="14" y="14" width="7" height="7" rx="1" /></>,
-    receipt: <><path d="M5 3v18l2-1.4 2 1.4 2-1.4 2 1.4 2-1.4 2 1.4V3l-2 1.4L15 3l-2 1.4L11 3 9 4.4 7 3z" /><line x1="8" y1="9" x2="16" y2="9" /><line x1="8" y1="13" x2="14" y2="13" /></>,
-    users: <><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M22 21v-2a4 4 0 0 0-3-3.87" /></>,
-    doc: <><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /><line x1="8" y1="13" x2="16" y2="13" /><line x1="8" y1="17" x2="13" y2="17" /></>,
-    filter: <><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" /></>,
-    insight: <><path d="M9 18h6" /><path d="M10 22h4" /><path d="M12 2a7 7 0 0 0-4 12.7c.6.5 1 1.3 1 2.1h6c0-.8.4-1.6 1-2.1A7 7 0 0 0 12 2z" /></>,
-  };
-  return <svg {...common} aria-hidden>{paths[name]}</svg>;
-}
-
-// ─── KPI card executivo ─────────────────────────────────────────────────────
-function Kpi({ label, value, sub, accent, icon }: { label: string; value: string; sub?: string; accent: string; icon: string }) {
-  return (
-    <div className="viab-kpi" style={{ "--accent": accent } as CSSProperties}>
-      <div className="viab-kpi-top">
-        <div className="viab-kpi-label">{label}</div>
-        <div className="viab-kpi-icon" style={{ background: `${accent}1F`, color: accent }}><Icon name={icon} /></div>
-      </div>
-      <div className="viab-kpi-value" style={{ color: accent }}>{value}</div>
-      {sub && <div className="viab-kpi-sub">{sub}</div>}
-    </div>
-  );
-}
 
 // ─── Painel de gráfico ──────────────────────────────────────────────────────
 function Panel({ title, sub, span, height = 320, children }: { title: string; sub?: string; span?: boolean; height?: number; children: ReactNode }) {
