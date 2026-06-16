@@ -53,6 +53,7 @@ export default function Dashboard() {
 
   const [area, setArea] = useState<AreaId>("indicadores");
   const [screen, setScreen] = useState<ScreenId | null>(null); // null = visão da área
+  const [filtersOpen, setFiltersOpen] = useState(false); // filtros recolhidos por padrão
 
   // filtros globais (indicadores)
   const [selAno, setSelAno] = useState<Set<number>>(new Set());
@@ -117,6 +118,9 @@ export default function Dashboard() {
 
   const screenDef = screen ? SCREENS[screen] : null;
   const showFilters = !!screenDef?.filter;
+  const filtrando =
+    selAno.size < opts.anos.length || selMes.size < opts.meses.length ||
+    selDep.size < opts.deptos.length || selInd.size < opts.inds.length;
 
   const pageNode = (() => {
     switch (screen) {
@@ -187,23 +191,34 @@ export default function Dashboard() {
           </div>
 
           {showFilters && (
-            <div className="filt-bar">
-              <div className="filt-item">
-                <div className="filt-label"><Icon name="filter" size={12} /> Ano</div>
-                <MultiSelect variant="body" label="" options={opts.anos} selected={selAno} onChange={setSelAno} />
-              </div>
-              <div className="filt-item">
-                <div className="filt-label"><Icon name="filter" size={12} /> Mês</div>
-                <MultiSelect variant="body" label="" options={opts.meses} selected={selMes} onChange={setSelMes} formatLabel={(m) => MESES_PT[m] ?? String(m)} />
-              </div>
-              <div className="filt-item">
-                <div className="filt-label"><Icon name="filter" size={12} /> Setor</div>
-                <MultiSelect variant="body" label="" options={opts.deptos} selected={selDep} onChange={setSelDep} />
-              </div>
-              <div className="filt-item" style={{ flex: "2 1 260px" }}>
-                <div className="filt-label"><Icon name="filter" size={12} /> Indicador</div>
-                <MultiSelect variant="body" label="" options={opts.inds} selected={selInd} onChange={setSelInd} />
-              </div>
+            <div className={`filt-wrap${filtersOpen ? " open" : ""}`}>
+              <button className="filt-toggle" onClick={() => setFiltersOpen((o) => !o)} aria-expanded={filtersOpen}>
+                <span className="filt-left">
+                  <Icon name="filter" size={15} /> Filtros
+                  {filtrando && <span className="filt-chip">filtrando</span>}
+                </span>
+                <span className="filt-chev"><Icon name={filtersOpen ? "chevronUp" : "chevronDown"} size={16} /></span>
+              </button>
+              {filtersOpen && (
+                <div className="filt-bar">
+                  <div className="filt-item">
+                    <div className="filt-label"><Icon name="filter" size={12} /> Ano</div>
+                    <MultiSelect variant="body" label="" options={opts.anos} selected={selAno} onChange={setSelAno} />
+                  </div>
+                  <div className="filt-item">
+                    <div className="filt-label"><Icon name="filter" size={12} /> Mês</div>
+                    <MultiSelect variant="body" label="" options={opts.meses} selected={selMes} onChange={setSelMes} formatLabel={(m) => MESES_PT[m] ?? String(m)} />
+                  </div>
+                  <div className="filt-item">
+                    <div className="filt-label"><Icon name="filter" size={12} /> Setor</div>
+                    <MultiSelect variant="body" label="" options={opts.deptos} selected={selDep} onChange={setSelDep} />
+                  </div>
+                  <div className="filt-item" style={{ flex: "2 1 260px" }}>
+                    <div className="filt-label"><Icon name="filter" size={12} /> Indicador</div>
+                    <MultiSelect variant="body" label="" options={opts.inds} selected={selInd} onChange={setSelInd} />
+                  </div>
+                </div>
+              )}
             </div>
           )}
 

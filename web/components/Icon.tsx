@@ -25,6 +25,8 @@ const PATHS: Record<string, ReactNode> = {
   alert: <><path d="M10.3 3.6 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.6a2 2 0 0 0-3.4 0z" /><line x1="12" y1="9" x2="12" y2="13" /><line x1="12" y1="17" x2="12" y2="17" /></>,
   arrowRight: <><line x1="5" y1="12" x2="19" y2="12" /><polyline points="13 6 19 12 13 18" /></>,
   arrowLeft: <><line x1="19" y1="12" x2="5" y2="12" /><polyline points="11 6 5 12 11 18" /></>,
+  chevronDown: <polyline points="6 9 12 15 18 9" />,
+  chevronUp: <polyline points="6 15 12 9 18 15" />,
   coins: <><ellipse cx="9" cy="6" rx="6" ry="3" /><path d="M3 6v5c0 1.7 2.7 3 6 3s6-1.3 6-3V6" /><path d="M9 14c-3.3 0-6 1.3-6 3v0c0 1.7 2.7 3 6 3 1.2 0 2.3-.2 3.2-.5" /><circle cx="17" cy="16" r="4" /></>,
 };
 

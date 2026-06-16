@@ -266,3 +266,15 @@ html, body {
 
 /* section title de overview */
 .area-sec { font-size:0.7rem; font-weight:800; letter-spacing:0.1em; text-transform:uppercase; color:#8a90a2; margin:1.4rem 0 0.7rem; }
+
+/* ─── Filtros recolhíveis (toggle) ─── */
+.filt-toggle { display:flex; align-items:center; justify-content:space-between; gap:10px; width:100%;
+  background:#fff; border:1px solid #edeef3; border-radius:14px; padding:0.7rem 1.1rem; cursor:pointer;
+  box-shadow:0 1px 3px rgba(16,24,40,.06); font-weight:700; color:#2f3192; font-size:0.9rem; transition:border-color .15s; }
+.filt-toggle:hover { border-color:#d7daec; }
+.filt-toggle .filt-left { display:flex; align-items:center; gap:8px; }
+.filt-toggle .filt-chip { font-size:0.68rem; font-weight:700; color:#f5781c; background:#fff3e8; border-radius:6px; padding:2px 8px; }
+.filt-toggle .filt-chev { color:#8a90a2; display:flex; }
+.filt-wrap { margin-bottom:1.1rem; }
+.filt-wrap.open .filt-toggle { border-bottom-left-radius:0; border-bottom-right-radius:0; border-bottom-color:transparent; }
+.filt-wrap.open .filt-bar { margin-bottom:0; border-top-left-radius:0; border-top-right-radius:0; }
