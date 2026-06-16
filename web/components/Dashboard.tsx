@@ -6,6 +6,8 @@ import { MultiSelect } from "./ui";
 import { loadIndicadores } from "@/lib/data";
 import { loadSge, type SgeRow } from "@/lib/sge";
 import { loadOrcamento, type OrcRow } from "@/lib/orcamento";
+import { loadFaturamento, type FatRow } from "@/lib/faturamento";
+import { loadRoyalties, type RoyRow } from "@/lib/royalties";
 import type { IndicadorRow } from "@/lib/indicators";
 import { MESES_PT } from "@/lib/meses";
 import VisaoGeral from "./pages/VisaoGeral";
@@ -16,28 +18,33 @@ import Marketing from "./pages/Marketing";
 import GoogleAnalytics from "./pages/GoogleAnalytics";
 import RhPage from "./pages/RhPage";
 import ViabilidadePage from "./pages/ViabilidadePage";
+import PerformancePage from "./pages/PerformancePage";
+import RoyaltiesPage from "./pages/RoyaltiesPage";
 import { IndicadoresOverview, ProjetosOverview, FinanceiroOverview } from "./pages/AreaOverviews";
 
 // ─── Telas e áreas ──────────────────────────────────────────────────────────
-type ScreenId = "geral" | "depto" | "sge" | "analytics" | "orc" | "viab" | "mkt" | "rh";
+type ScreenId = "geral" | "depto" | "sge" | "analytics" | "orc" | "viab" | "royalties" | "fat" | "mkt" | "rh";
 
 const SCREENS: Record<ScreenId, { area: AreaId; label: string; icon: string; filter?: boolean }> = {
   geral: { area: "indicadores", label: "Visão Geral", icon: "chart", filter: true },
   depto: { area: "indicadores", label: "Por Departamento", icon: "building", filter: true },
+  fat: { area: "performance", label: "Faturamento das Unidades", icon: "chart" },
   sge: { area: "projetos", label: "Diagnóstico SGE", icon: "search" },
   analytics: { area: "projetos", label: "Portal do Franqueado", icon: "globe" },
   orc: { area: "financeiro", label: "Orçamento", icon: "receipt" },
   viab: { area: "financeiro", label: "Viabilidade Financeira", icon: "wallet" },
+  royalties: { area: "financeiro", label: "Royalties e Fundo de Marketing", icon: "coins" },
   mkt: { area: "marketing", label: "Marketing", icon: "megaphone" },
   rh: { area: "rh", label: "Recursos Humanos", icon: "users" },
 };
 
-type AreaId = "indicadores" | "projetos" | "financeiro" | "marketing" | "rh";
+type AreaId = "indicadores" | "performance" | "projetos" | "financeiro" | "marketing" | "rh";
 
 const AREAS: { id: AreaId; label: string; icon: string; desc: string; screens: ScreenId[] }[] = [
   { id: "indicadores", label: "Indicadores", icon: "chart", desc: "KPIs por setor, indicador e período", screens: ["geral", "depto"] },
+  { id: "performance", label: "Performance", icon: "trendingUp", desc: "Faturamento das unidades franqueadas", screens: ["fat"] },
   { id: "projetos", label: "Projetos", icon: "layers", desc: "Diagnóstico SGE e Portal do Franqueado", screens: ["sge", "analytics"] },
-  { id: "financeiro", label: "Financeiro", icon: "wallet", desc: "Orçamento e Viabilidade Financeira", screens: ["orc", "viab"] },
+  { id: "financeiro", label: "Financeiro", icon: "wallet", desc: "Orçamento, Viabilidade e Royalties", screens: ["orc", "viab", "royalties"] },
   { id: "marketing", label: "Marketing", icon: "megaphone", desc: "Painéis e campanhas de marketing", screens: ["mkt"] },
   { id: "rh", label: "RH", icon: "users", desc: "Recursos Humanos e folha", screens: ["rh"] },
 ];
@@ -50,6 +57,10 @@ export default function Dashboard() {
   const [sgeErr, setSgeErr] = useState<string | null>(null);
   const [orc, setOrc] = useState<OrcRow[] | null>(null);
   const [orcErr, setOrcErr] = useState<string | null>(null);
+  const [fat, setFat] = useState<FatRow[] | null>(null);
+  const [fatErr, setFatErr] = useState<string | null>(null);
+  const [roy, setRoy] = useState<RoyRow[] | null>(null);
+  const [royErr, setRoyErr] = useState<string | null>(null);
 
   const [area, setArea] = useState<AreaId>("indicadores");
   const [screen, setScreen] = useState<ScreenId | null>(null); // null = visão da área
@@ -63,10 +74,12 @@ export default function Dashboard() {
 
   async function loadAll() {
     setLoading(true);
-    const [i, s, o] = await Promise.all([loadIndicadores(), loadSge(), loadOrcamento()]);
+    const [i, s, o, f, r] = await Promise.all([loadIndicadores(), loadSge(), loadOrcamento(), loadFaturamento(), loadRoyalties()]);
     setIndic(i.data); setIndicErr(i.error);
     setSge(s.data); setSgeErr(s.error);
     setOrc(o.data); setOrcErr(o.error);
+    setFat(f.data); setFatErr(f.error);
+    setRoy(r.data); setRoyErr(r.error);
     if (i.data) {
       setSelAno(new Set(uniqNums(i.data.map((r) => r.Ano))));
       setSelMes(new Set(uniqNums(i.data.map((r) => r.Mes))));
@@ -128,6 +141,8 @@ export default function Dashboard() {
       case "depto": return <PorDepartamento df={dfFiltered} dfFull={indic ?? []} selAno={[...selAno]} error={indicErr} />;
       case "sge": return <SgePage data={sge} error={sgeErr} />;
       case "orc": return <OrcamentoPage data={orc} error={orcErr} />;
+      case "royalties": return <RoyaltiesPage data={roy} error={royErr} />;
+      case "fat": return <PerformancePage data={fat} error={fatErr} />;
       case "mkt": return <Marketing />;
       case "analytics": return <GoogleAnalytics />;
       case "rh": return <RhPage />;
@@ -140,7 +155,7 @@ export default function Dashboard() {
     switch (area) {
       case "indicadores": return <IndicadoresOverview df={dfFiltered} onOpen={(s) => setScreen(s as ScreenId)} />;
       case "projetos": return <ProjetosOverview sge={sge} onOpen={(s) => setScreen(s as ScreenId)} />;
-      case "financeiro": return <FinanceiroOverview orc={orc} onOpen={(s) => setScreen(s as ScreenId)} />;
+      case "financeiro": return <FinanceiroOverview orc={orc} roy={roy} onOpen={(s) => setScreen(s as ScreenId)} />;
       default: return null;
     }
   })();

@@ -5,6 +5,7 @@ import { Kpi } from "../Kpi";
 import { aggIndicators, type IndicadorRow } from "@/lib/indicators";
 import { calcPctSetor, SETORES_FULL, type SgeRow } from "@/lib/sge";
 import { type OrcRow } from "@/lib/orcamento";
+import { type RoyRow } from "@/lib/royalties";
 import { fmtBrl, fmtPct } from "@/lib/format";
 import { PROJETOS } from "@/lib/viabilidadeData";
 
@@ -131,7 +132,7 @@ export function ProjetosOverview({ sge, onOpen }: { sge: SgeRow[] | null; onOpen
 // ════════════════════════════════════════════════════════════════════════
 // FINANCEIRO — Orçamento + Viabilidade Financeira
 // ════════════════════════════════════════════════════════════════════════
-export function FinanceiroOverview({ orc, onOpen }: { orc: OrcRow[] | null; onOpen: (s: string) => void }) {
+export function FinanceiroOverview({ orc, roy, onOpen }: { orc: OrcRow[] | null; roy: RoyRow[] | null; onOpen: (s: string) => void }) {
   const ins = useMemo(() => {
     const orcado = (orc ?? []).filter((r) => r.Tipo_Valor === "Orçado").reduce((a, r) => a + (r.Valor ?? 0), 0);
     const real = (orc ?? []).filter((r) => r.Tipo_Valor === "Realizado").reduce((a, r) => a + (r.Valor ?? 0), 0);
@@ -139,8 +140,11 @@ export function FinanceiroOverview({ orc, onOpen }: { orc: OrcRow[] | null; onOp
     const desvio = real - orcado;
     // melhor projeto por VPL
     const best = [...PROJETOS].sort((a, b) => b.kpis.vpl - a.kpis.vpl)[0];
-    return { orcado, real, exec, desvio, best, nProj: PROJETOS.length };
-  }, [orc]);
+    // royalties
+    const royTot = (roy ?? []).reduce((a, r) => a + r.Royalties, 0);
+    const fundoTot = (roy ?? []).reduce((a, r) => a + r.FundoMkt, 0);
+    return { orcado, real, exec, desvio, best, nProj: PROJETOS.length, royTot, fundoTot, hasRoy: (roy ?? []).length > 0 };
+  }, [orc, roy]);
 
   const hasOrc = ins.orcado > 0 || ins.real > 0;
 
@@ -166,9 +170,22 @@ export function FinanceiroOverview({ orc, onOpen }: { orc: OrcRow[] | null; onOp
         <Kpi label="Payback (maior VPL)" value={`${ins.best.kpis.payback} meses`} sub={ins.best.nome} accent={C.blue} icon="clock" />
       </div>
 
+      {ins.hasRoy && (
+        <>
+          <div className="area-sec">Royalties e Fundo de Marketing</div>
+          <div className="viab-kpis cols-4">
+            <Kpi label="Royalties" value={fmtBrl(ins.royTot)} sub="Total arrecadado" accent={C.blue} icon="coins" />
+            <Kpi label="Fundo de Marketing" value={fmtBrl(ins.fundoTot)} sub="Total arrecadado" accent={C.orange} icon="megaphone" />
+            <Kpi label="Total Franqueadora" value={fmtBrl(ins.royTot + ins.fundoTot)} sub="Royalties + fundo" accent={C.green} icon="wallet" />
+            <Kpi label="Unidades Pagantes" value={String(new Set((roy ?? []).map((r) => r.Franquia)).size)} sub="Franquias na base" accent={C.blue} icon="building" />
+          </div>
+        </>
+      )}
+
       <Drills>
         <DrillCard icon="receipt" title="Orçamento" sub="Orçado × Realizado por área e mês" onClick={() => onOpen("orc")} />
         <DrillCard icon="wallet" title="Viabilidade Financeira" sub="Simulação de resultados em 5 anos" onClick={() => onOpen("viab")} />
+        <DrillCard icon="coins" title="Royalties e Fundo de Marketing" sub="Receitas da franqueadora por unidade" onClick={() => onOpen("royalties")} />
       </Drills>
     </div>
   );
