@@ -25,7 +25,7 @@ const TABS = [
   { id: "mkt", label: "📣  Marketing", sidebar: false },
   { id: "analytics", label: "📈  Portal do Franqueado", sidebar: false },
   { id: "rh", label: "👥  RH", sidebar: false },
-  { id: "viab", label: "🏦  Viabilidade Franqueado", sidebar: false },
+  { id: "viab", label: "💼  Viabilidade Financeira", sidebar: false },
 ] as const;
 
 type TabId = (typeof TABS)[number]["id"];

@@ -1,229 +1,206 @@
-// Builders de gráficos da Viabilidade do Franqueado — Projeto Compact 272K.
-// Replica os 4 gráficos da aba "Dashboard Franqueado (5anos)" da planilha.
-import { COLOR } from "@/lib/theme";
+// Builders de gráficos da Viabilidade Financeira — estilo "clean" (Power BI).
+// Cada função recebe um Projeto e devolve a figura Plotly.
 import { fmtBrl, fmtPct } from "@/lib/format";
-import {
-  anos, faturamento, lucro, lucratividade, rentabilidade, fluxoCaixaAcumulado, kpis,
-} from "@/lib/viabilidade";
-import {
-  investimento, despesasFixasTotal, rhTotalMensal, dreAnual,
-} from "@/lib/viabilidadeDetalhe";
+import { ANOS, type Projeto } from "@/lib/viabilidadeData";
 import type { PlotlyFigure } from "./PlotlyChartInner";
 
-function baseL(): Record<string, any> {
+// ─── Paleta / layout clean (Power BI) ─────────────────────────────────────
+const ACCENT = "#F47920";      // laranja LocExpress
+const ACCENT_SOFT = "rgba(244,121,32,0.12)";
+const SLATE = "#4C5561";       // série neutra
+const BLUE = "#118DFF";        // azul Power BI (linhas %)
+const RED = "#D64550";
+const INK = "#252423";         // títulos
+const MUTED = "#605E5C";       // textos de eixo
+const GRID = "#EDEBE9";        // linhas de grade horizontais
+const POSITIVE = "#107C41";    // verde
+const anos = [...ANOS];
+
+function clean(titleText: string, extra: Record<string, any> = {}): Record<string, any> {
   return {
-    paper_bgcolor: "rgba(0,0,0,0)", plot_bgcolor: "rgba(0,0,0,0)",
-    font: { family: "Inter, Segoe UI, sans-serif", color: "#374151", size: 14 },
-    margin: { l: 10, r: 10, t: 54, b: 10 },
-    hoverlabel: { bgcolor: "#FFFFFF", bordercolor: "#E5E7EB", font_size: 13 },
-    legend: { orientation: "h", yanchor: "bottom", y: 1.02, xanchor: "right", x: 1, bgcolor: "rgba(0,0,0,0)" },
+    paper_bgcolor: "rgba(0,0,0,0)",
+    plot_bgcolor: "rgba(0,0,0,0)",
+    font: { family: "Segoe UI, Inter, sans-serif", color: MUTED, size: 12 },
+    title: { text: titleText, font: { size: 15, color: INK, family: "Segoe UI, Inter, sans-serif" }, x: 0, xanchor: "left", y: 0.97 },
+    margin: { l: 8, r: 8, t: 46, b: 8 },
+    hoverlabel: { bgcolor: "#FFFFFF", bordercolor: GRID, font: { size: 12, color: INK } },
+    legend: { orientation: "h", yanchor: "bottom", y: 1.0, xanchor: "left", x: 0, font: { size: 11, color: MUTED }, bgcolor: "rgba(0,0,0,0)" },
+    xaxis: { showgrid: false, zeroline: false, showline: false, ticks: "", automargin: true, tickfont: { size: 12, color: MUTED } },
+    yaxis: { showgrid: true, gridcolor: GRID, gridwidth: 1, zeroline: false, showline: false, ticks: "", automargin: true, tickfont: { size: 11, color: MUTED } },
+    ...extra,
   };
-}
-function titleViab(text: string): Record<string, any> {
-  return { text, font: { size: 18, color: COLOR.INDIGO, weight: "bold" }, x: 0.01 };
 }
 
 // ─── Fluxo de Caixa Acumulado (60 meses) ──────────────────────────────────
-export function chartFluxoCaixaAcumulado(): PlotlyFigure {
-  const x = fluxoCaixaAcumulado.map((_, i) => i + 1);
+export function chartFluxoCaixaAcumulado(p: Projeto): PlotlyFigure {
+  const fcx = p.fluxoCaixaAcumulado;
+  const x = fcx.map((_, i) => i + 1);
   const data = [
     {
-      type: "scatter", mode: "lines", name: "Fluxo de Caixa Acumulado",
-      x, y: fluxoCaixaAcumulado,
-      line: { color: COLOR.ORANGE, width: 3 },
-      fill: "tozeroy", fillcolor: "rgba(244,121,32,0.12)",
+      type: "scatter", mode: "lines", name: "Fluxo acumulado",
+      x, y: fcx,
+      line: { color: ACCENT, width: 2.5, shape: "spline", smoothing: 0.6 },
+      fill: "tozeroy", fillcolor: ACCENT_SOFT,
       hovertemplate: "Mês %{x}<br>%{customdata}<extra></extra>",
-      customdata: fluxoCaixaAcumulado.map((v) => fmtBrl(v)),
+      customdata: fcx.map((v) => fmtBrl(v)),
     },
   ];
-  const layout = {
-    ...baseL(), title: titleViab("Fluxo de Caixa Acumulado (60 meses)"), showlegend: false,
-    xaxis: { title: { text: "Mês", font: { size: 12 } }, gridcolor: "#F0F0F0", tickfont: { size: 12 }, dtick: 6 },
-    yaxis: { gridcolor: "#F0F0F0", tickfont: { size: 12 }, tickprefix: "R$ ", zeroline: false },
-    height: 400,
+  const layout = clean("Fluxo de Caixa Acumulado", {
+    showlegend: false,
+    xaxis: { showgrid: false, zeroline: false, showline: false, ticks: "", dtick: 6, tickfont: { size: 11, color: MUTED }, title: { text: "Mês", font: { size: 11, color: MUTED } } },
     shapes: [
-      // Linha do zero
-      { type: "line", xref: "paper", x0: 0, x1: 1, y0: 0, y1: 0, line: { color: "#9CA3AF", width: 1, dash: "dot" } },
-      // Marcação do payback
-      { type: "line", x0: kpis.payback, x1: kpis.payback, yref: "paper", y0: 0, y1: 1, line: { color: COLOR.INDIGO, width: 1.5, dash: "dash" } },
+      { type: "line", xref: "paper", x0: 0, x1: 1, y0: 0, y1: 0, line: { color: "#C8C6C4", width: 1 } },
+      { type: "line", x0: p.kpis.payback, x1: p.kpis.payback, yref: "paper", y0: 0, y1: 1, line: { color: SLATE, width: 1, dash: "dot" } },
     ],
     annotations: [
-      { x: kpis.payback, yref: "paper", y: 1, text: `Payback: ${kpis.payback}m`, showarrow: false, font: { size: 12, color: COLOR.INDIGO }, xanchor: "left", yanchor: "top", bgcolor: "rgba(255,255,255,0.7)" },
+      { x: p.kpis.payback, yref: "paper", y: 1, text: `Payback ${p.kpis.payback}m`, showarrow: false, font: { size: 11, color: SLATE }, xanchor: "left", yanchor: "top" },
     ],
-  };
+  });
   return { data, layout };
 }
 
-// ─── Faturamento bruto médio mensal por ano ───────────────────────────────
-export function chartFaturamento(): PlotlyFigure {
+// ─── Faturamento bruto médio mensal por ano (colunas) ─────────────────────
+export function chartFaturamento(p: Projeto): PlotlyFigure {
   const data = [
     {
-      type: "scatter", mode: "lines+markers+text", name: "Faturamento Bruto",
-      x: [...anos], y: faturamento,
-      line: { color: COLOR.ORANGE, width: 3 }, marker: { size: 10, color: COLOR.ORANGE },
-      fill: "tozeroy", fillcolor: "rgba(244,121,32,0.12)",
-      text: faturamento.map((v) => fmtBrl(v)), textposition: "top center",
-      textfont: { size: 13, color: COLOR.ORANGE },
+      type: "bar", name: "Faturamento", x: anos, y: p.faturamento,
+      marker: { color: ACCENT }, width: 0.55,
+      text: p.faturamento.map((v) => fmtBrl(v)), textposition: "outside",
+      textfont: { size: 12, color: SLATE }, cliponaxis: false,
       hovertemplate: "%{x}<br>%{text}<extra></extra>",
     },
   ];
-  const layout = {
-    ...baseL(), title: titleViab("Faturamento Bruto Médio Mensal"), showlegend: false,
-    xaxis: { gridcolor: "#F0F0F0", tickfont: { size: 13 } },
-    yaxis: { gridcolor: "#F0F0F0", tickfont: { size: 12 }, tickprefix: "R$ " },
-    height: 400,
-  };
-  return { data, layout };
+  return { data, layout: clean("Faturamento Bruto Médio Mensal", { showlegend: false, bargap: 0.45 }) };
 }
 
-// ─── Evolução Lucratividade (barras = lucro R$ | linha = lucratividade %) ──
-export function chartLucratividade(): PlotlyFigure {
+// ─── Evolução Lucratividade (colunas lucro + linha %) ─────────────────────
+export function chartLucratividade(p: Projeto): PlotlyFigure {
   const data = [
     {
-      type: "bar", name: "Lucro Líquido Médio Mensal", x: [...anos], y: lucro,
-      marker: { color: lucro.map((v) => (v < 0 ? COLOR.RED : COLOR.ORANGE)) }, opacity: 0.9,
-      text: lucro.map((v) => fmtBrl(v)), textposition: "outside", textfont: { size: 13, color: COLOR.GRAY_DARK },
+      type: "bar", name: "Lucro líquido mensal", x: anos, y: p.lucro,
+      marker: { color: p.lucro.map((v) => (v < 0 ? RED : ACCENT)) }, width: 0.55,
+      text: p.lucro.map((v) => fmtBrl(v)), textposition: "outside",
+      textfont: { size: 11, color: SLATE }, cliponaxis: false,
       hovertemplate: "%{x}<br>Lucro: %{text}<extra></extra>",
     },
     {
-      type: "scatter", mode: "lines+markers", name: "Lucratividade (%)", yaxis: "y2",
-      x: [...anos], y: lucratividade,
-      line: { color: COLOR.INDIGO, width: 3 }, marker: { size: 9, color: COLOR.INDIGO },
-      text: lucratividade.map((v) => fmtPct(v)),
+      type: "scatter", mode: "lines+markers", name: "Lucratividade %", yaxis: "y2",
+      x: anos, y: p.lucratividade,
+      line: { color: BLUE, width: 2.5 }, marker: { size: 7, color: BLUE },
+      text: p.lucratividade.map((v) => fmtPct(v)),
       hovertemplate: "%{x}<br>Lucratividade: %{text}<extra></extra>",
     },
   ];
-  const layout = {
-    ...baseL(), title: titleViab("Evolução da Lucratividade"),
-    xaxis: { gridcolor: "#F0F0F0", tickfont: { size: 13 } },
-    yaxis: { gridcolor: "#F0F0F0", tickfont: { size: 12 }, tickprefix: "R$ " },
-    yaxis2: { overlaying: "y", side: "right", tickfont: { size: 12, color: COLOR.INDIGO }, ticksuffix: "%", showgrid: false, zeroline: false },
-    height: 400,
-  };
+  const layout = clean("Evolução da Lucratividade", {
+    bargap: 0.45,
+    yaxis2: { overlaying: "y", side: "right", showgrid: false, zeroline: false, showline: false, ticks: "", ticksuffix: "%", tickfont: { size: 11, color: BLUE } },
+  });
   return { data, layout };
 }
 
-// ─── Evolução Rentabilidade (barras = lucro R$ | linha = rentabilidade %) ──
-export function chartRentabilidade(): PlotlyFigure {
+// ─── Evolução Rentabilidade (colunas lucro + linha %) ─────────────────────
+export function chartRentabilidade(p: Projeto): PlotlyFigure {
   const data = [
     {
-      type: "bar", name: "Lucro Líquido Médio Mensal", x: [...anos], y: lucro,
-      marker: { color: lucro.map((v) => (v < 0 ? COLOR.RED : COLOR.ORANGE)) }, opacity: 0.9,
-      text: lucro.map((v) => fmtBrl(v)), textposition: "outside", textfont: { size: 13, color: COLOR.GRAY_DARK },
+      type: "bar", name: "Lucro líquido mensal", x: anos, y: p.lucro,
+      marker: { color: p.lucro.map((v) => (v < 0 ? RED : ACCENT)) }, width: 0.55,
+      text: p.lucro.map((v) => fmtBrl(v)), textposition: "outside",
+      textfont: { size: 11, color: SLATE }, cliponaxis: false,
       hovertemplate: "%{x}<br>Lucro: %{text}<extra></extra>",
     },
     {
-      type: "scatter", mode: "lines+markers", name: "Rentabilidade (%)", yaxis: "y2",
-      x: [...anos], y: rentabilidade,
-      line: { color: COLOR.BLUE_DARK, width: 3 }, marker: { size: 9, color: COLOR.BLUE_DARK },
-      text: rentabilidade.map((v) => fmtPct(v)),
+      type: "scatter", mode: "lines+markers", name: "Rentabilidade %", yaxis: "y2",
+      x: anos, y: p.rentabilidade,
+      line: { color: SLATE, width: 2.5 }, marker: { size: 7, color: SLATE },
+      text: p.rentabilidade.map((v) => fmtPct(v)),
       hovertemplate: "%{x}<br>Rentabilidade: %{text}<extra></extra>",
     },
   ];
-  const layout = {
-    ...baseL(), title: titleViab("Evolução da Rentabilidade"),
-    xaxis: { gridcolor: "#F0F0F0", tickfont: { size: 13 } },
-    yaxis: { gridcolor: "#F0F0F0", tickfont: { size: 12 }, tickprefix: "R$ " },
-    yaxis2: { overlaying: "y", side: "right", tickfont: { size: 12, color: COLOR.BLUE_DARK }, ticksuffix: "%", showgrid: false, zeroline: false },
-    height: 400,
-  };
+  const layout = clean("Evolução da Rentabilidade", {
+    bargap: 0.45,
+    yaxis2: { overlaying: "y", side: "right", showgrid: false, zeroline: false, showline: false, ticks: "", ticksuffix: "%", tickfont: { size: 11, color: SLATE } },
+  });
   return { data, layout };
 }
 
 // ─── Composição do Investimento Inicial (donut) ───────────────────────────
-export function chartInvestimentoPie(): PlotlyFigure {
-  const palette = ["#F47920", "#2D3192", "#FFA040", "#3F3FBF", "#FFB300", "#00C853", "#6366F1", "#F44336"];
+export function chartInvestimentoPie(p: Projeto): PlotlyFigure {
+  const palette = [ACCENT, SLATE, "#FFA040", "#7A828E", "#FFB300", POSITIVE, BLUE, RED];
   const data = [
     {
-      type: "pie", hole: 0.5,
-      labels: investimento.map((i) => i.label.replace(/^\d+\.\s*/, "")),
-      values: investimento.map((i) => i.valor),
-      marker: { colors: palette },
-      textinfo: "percent", textposition: "inside", insidetextorientation: "radial",
+      type: "pie", hole: 0.62,
+      labels: p.investimento.map((i) => i.label.replace(/^\d+\.\s*/, "")),
+      values: p.investimento.map((i) => i.valor),
+      marker: { colors: palette, line: { color: "#FFFFFF", width: 2 } },
+      textinfo: "percent", textposition: "inside",
+      textfont: { size: 11, color: "#FFFFFF" },
       hovertemplate: "%{label}<br>%{customdata}  (%{percent})<extra></extra>",
-      customdata: investimento.map((i) => fmtBrl(i.valor)),
+      customdata: p.investimento.map((i) => fmtBrl(i.valor)),
       sort: false,
     },
   ];
-  const layout = {
-    ...baseL(), title: titleViab("Composição do Investimento Inicial"),
-    legend: { orientation: "v", x: 1.0, y: 0.5, font: { size: 11 } },
-    margin: { l: 10, r: 10, t: 54, b: 10 }, height: 400,
-  };
+  const layout = clean("Composição do Investimento", {
+    legend: { orientation: "v", x: 1.0, xanchor: "right", y: 0.5, font: { size: 11, color: MUTED } },
+    xaxis: { visible: false }, yaxis: { visible: false },
+  });
   return { data, layout };
 }
 
-// ─── Evolução das Despesas Fixas (total mensal por ano) ───────────────────
-export function chartDespesasEvolucao(): PlotlyFigure {
+// ─── Despesas Fixas mensais por ano (colunas) ─────────────────────────────
+export function chartDespesasEvolucao(p: Projeto): PlotlyFigure {
   const data = [
     {
-      type: "bar", name: "Despesas Fixas (mensal)", x: [...anos], y: despesasFixasTotal,
-      marker: { color: COLOR.INDIGO }, opacity: 0.9,
-      text: despesasFixasTotal.map((v) => fmtBrl(v)), textposition: "outside",
-      textfont: { size: 13, color: COLOR.INDIGO },
+      type: "bar", name: "Despesas fixas mensais", x: anos, y: p.despesasFixasTotal,
+      marker: { color: SLATE }, width: 0.55,
+      text: p.despesasFixasTotal.map((v) => fmtBrl(v)), textposition: "outside",
+      textfont: { size: 12, color: SLATE }, cliponaxis: false,
       hovertemplate: "%{x}<br>%{text}<extra></extra>",
     },
   ];
-  const layout = {
-    ...baseL(), title: titleViab("Despesas Fixas Mensais por Ano"), showlegend: false,
-    xaxis: { gridcolor: "#F0F0F0", tickfont: { size: 13 } },
-    yaxis: { gridcolor: "#F0F0F0", tickfont: { size: 12 }, tickprefix: "R$ " },
-    height: 400,
-  };
-  return { data, layout };
+  return { data, layout: clean("Despesas Fixas Mensais por Ano", { showlegend: false, bargap: 0.45 }) };
 }
 
-// ─── Evolução do custo de Recursos Humanos (folha mensal por ano) ─────────
-export function chartRhEvolucao(): PlotlyFigure {
+// ─── Custo de pessoal mensal por ano (colunas) ────────────────────────────
+export function chartRhEvolucao(p: Projeto): PlotlyFigure {
   const data = [
     {
-      type: "bar", name: "Folha mensal", x: [...anos], y: rhTotalMensal,
-      marker: { color: COLOR.ORANGE }, opacity: 0.9,
-      text: rhTotalMensal.map((v) => fmtBrl(v)), textposition: "outside",
-      textfont: { size: 13, color: COLOR.ORANGE },
+      type: "bar", name: "Folha mensal", x: anos, y: p.rhTotalMensal,
+      marker: { color: ACCENT }, width: 0.55,
+      text: p.rhTotalMensal.map((v) => fmtBrl(v)), textposition: "outside",
+      textfont: { size: 12, color: SLATE }, cliponaxis: false,
       hovertemplate: "%{x}<br>%{text}<extra></extra>",
     },
   ];
-  const layout = {
-    ...baseL(), title: titleViab("Custo de Pessoal Mensal por Ano"), showlegend: false,
-    xaxis: { gridcolor: "#F0F0F0", tickfont: { size: 13 } },
-    yaxis: { gridcolor: "#F0F0F0", tickfont: { size: 12 }, tickprefix: "R$ " },
-    height: 400,
-  };
-  return { data, layout };
+  return { data, layout: clean("Custo de Pessoal Mensal por Ano", { showlegend: false, bargap: 0.45 }) };
 }
 
-// ─── DRE anual: Receita Bruta × Despesas Operacionais × Lucro Operacional ──
-export function chartDreAnual(): PlotlyFigure {
-  const find = (l: string) => dreAnual.find((d) => d.label === l)?.anos ?? [0, 0, 0, 0, 0];
+// ─── DRE anual: Receita × Despesas × Lucro ────────────────────────────────
+export function chartDreAnual(p: Projeto): PlotlyFigure {
+  const find = (l: string) => p.dreAnual.find((d) => d.label === l)?.anos ?? [0, 0, 0, 0, 0];
   const receita = find("(+) Receita Bruta");
   const despOp = find("(-) Despesas Operacionais");
-  const lucro = find("(=) Lucro Operacional");
+  const lucroOp = find("(=) Lucro Operacional");
   const data = [
     {
-      type: "bar", name: "Receita Bruta", x: [...anos], y: receita,
-      marker: { color: COLOR.INDIGO }, opacity: 0.9,
-      hovertemplate: "%{x}<br>Receita: %{y:,.0f}<extra></extra>",
+      type: "bar", name: "Receita Bruta", x: anos, y: receita,
+      marker: { color: SLATE }, width: 0.28, offsetgroup: "1",
+      hovertemplate: "%{x}<br>Receita: %{customdata}<extra></extra>",
+      customdata: receita.map((v) => fmtBrl(v)),
     },
     {
-      type: "bar", name: "Despesas Operacionais", x: [...anos], y: despOp,
-      marker: { color: COLOR.RED }, opacity: 0.85,
-      hovertemplate: "%{x}<br>Despesas: %{y:,.0f}<extra></extra>",
+      type: "bar", name: "Despesas Operacionais", x: anos, y: despOp,
+      marker: { color: "#C8C6C4" }, width: 0.28, offsetgroup: "2",
+      hovertemplate: "%{x}<br>Despesas: %{customdata}<extra></extra>",
+      customdata: despOp.map((v) => fmtBrl(v)),
     },
     {
       type: "scatter", mode: "lines+markers+text", name: "Lucro Operacional",
-      x: [...anos], y: lucro,
-      line: { color: COLOR.ORANGE, width: 3 }, marker: { size: 9, color: COLOR.ORANGE },
-      text: lucro.map((v) => fmtBrl(v)), textposition: "top center",
-      textfont: { size: 12, color: COLOR.ORANGE },
+      x: anos, y: lucroOp,
+      line: { color: ACCENT, width: 2.5 }, marker: { size: 7, color: ACCENT },
+      text: lucroOp.map((v) => fmtBrl(v)), textposition: "top center",
+      textfont: { size: 11, color: ACCENT }, cliponaxis: false,
       hovertemplate: "%{x}<br>Lucro: %{text}<extra></extra>",
     },
   ];
-  const layout = {
-    ...baseL(), title: titleViab("DRE Anual — Receita × Despesas × Lucro"), barmode: "group",
-    xaxis: { gridcolor: "#F0F0F0", tickfont: { size: 13 } },
-    yaxis: { gridcolor: "#F0F0F0", tickfont: { size: 12 }, tickprefix: "R$ " },
-    height: 420,
-  };
-  return { data, layout };
+  return { data, layout: clean("DRE Anual — Receita × Despesas × Lucro", { barmode: "group", bargap: 0.35 }) };
 }

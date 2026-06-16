@@ -1,6 +1,6 @@
 "use client";
 import { useState } from "react";
-import { SecHeader, KpiCard, ChartBox, DataTable, InfoBox, type Column } from "../ui";
+import { SecHeader, KpiCard, ChartBox, DataTable, InfoBox, BodySelect, type Column } from "../ui";
 import PlotlyChart from "../charts/PlotlyChart";
 import {
   chartFluxoCaixaAcumulado, chartFaturamento, chartLucratividade, chartRentabilidade,
@@ -8,11 +8,7 @@ import {
 } from "../charts/viabilidade";
 import { COLOR } from "@/lib/theme";
 import { fmtBrl, fmtPct } from "@/lib/format";
-import { PROJETO, kpis, anos, faturamento, lucro, lucratividade, rentabilidade } from "@/lib/viabilidade";
-import {
-  investimento, investimentoTotal, despesasFixas, despesasFixasTotal,
-  rhCargos, rhTotalMensal, rhQtd, dreAnual,
-} from "@/lib/viabilidadeDetalhe";
+import { PROJETOS, ANOS, type Projeto } from "@/lib/viabilidadeData";
 
 const SUBTABS = [
   { id: "resumo", label: "📊  Resumo" },
@@ -23,14 +19,30 @@ const SUBTABS = [
 ] as const;
 type SubId = (typeof SUBTABS)[number]["id"];
 
-const ANO_COLS: Column[] = anos.map((a, i) => ({ key: `a${i}`, label: a, align: "right" as const }));
+const ANO_COLS: Column[] = ANOS.map((a, i) => ({ key: `a${i}`, label: a, align: "right" as const }));
 
 export default function ViabilidadePage() {
+  const [slug, setSlug] = useState<string>(PROJETOS[0].slug);
   const [sub, setSub] = useState<SubId>("resumo");
+  const p = PROJETOS.find((x) => x.slug === slug) ?? PROJETOS[0];
 
   return (
     <div>
-      <SecHeader>🏦 Viabilidade do Franqueado — {PROJETO}</SecHeader>
+      <SecHeader>💼 Viabilidade Financeira</SecHeader>
+
+      <div className="chart-box" style={{ padding: "0.9rem 1.2rem", marginBottom: "1rem", display: "flex", flexWrap: "wrap", gap: "1.5rem", alignItems: "flex-end" }}>
+        <div style={{ minWidth: 280 }}>
+          <BodySelect
+            label="Projeto"
+            value={slug}
+            options={PROJETOS.map((x) => ({ value: x.slug, label: x.nome }))}
+            onChange={setSlug}
+          />
+        </div>
+        <div style={{ color: COLOR.GRAY_MID, fontSize: "0.85rem", paddingBottom: 6 }}>
+          Simulação dos resultados do franqueado em 5 anos · valores em R$
+        </div>
+      </div>
 
       <div className="lx-tabs" style={{ marginBottom: "1rem" }}>
         {SUBTABS.map((t) => (
@@ -40,17 +52,17 @@ export default function ViabilidadePage() {
         ))}
       </div>
 
-      {sub === "resumo" && <Resumo />}
-      {sub === "invest" && <Investimento />}
-      {sub === "despesas" && <Despesas />}
-      {sub === "rh" && <RecursosHumanos />}
-      {sub === "dre" && <Dre />}
+      {sub === "resumo" && <Resumo p={p} />}
+      {sub === "invest" && <Investimento p={p} />}
+      {sub === "despesas" && <Despesas p={p} />}
+      {sub === "rh" && <RecursosHumanos p={p} />}
+      {sub === "dre" && <Dre p={p} />}
     </div>
   );
 }
 
-// ─── Resumo (replica a aba "Dashboard Franqueado (5anos)") ─────────────────
-function Resumo() {
+// ─── Resumo ─────────────────────────────────────────────────────────────────
+function Resumo({ p }: { p: Projeto }) {
   const tableCols: Column[] = [
     { key: "ano", label: "Período" },
     { key: "fat", label: "Faturamento Médio Mensal", align: "right" },
@@ -61,39 +73,34 @@ function Resumo() {
     { key: "rent", label: "Rentabilidade", align: "right",
       style: (r) => ({ color: r.rentNum < 0 ? COLOR.RED : COLOR.BLUE_DARK }) },
   ];
-  const tableRows = anos.map((ano, i) => ({
+  const tableRows = ANOS.map((ano, i) => ({
     ano,
-    fat: fmtBrl(faturamento[i]),
-    lucro: fmtBrl(lucro[i]), lucroNum: lucro[i],
-    lucrat: fmtPct(lucratividade[i]), lucratNum: lucratividade[i],
-    rent: fmtPct(rentabilidade[i]), rentNum: rentabilidade[i],
+    fat: fmtBrl(p.faturamento[i]),
+    lucro: fmtBrl(p.lucro[i]), lucroNum: p.lucro[i],
+    lucrat: fmtPct(p.lucratividade[i]), lucratNum: p.lucratividade[i],
+    rent: fmtPct(p.rentabilidade[i]), rentNum: p.rentabilidade[i],
   }));
 
   return (
     <div>
-      <InfoBox style={{ marginBottom: "1rem" }}>
-        📑 Simulação dos resultados do franqueado em 5 anos, com base nas projeções do
-        modelo financeiro. Valores em reais (R$).
-      </InfoBox>
-
       <div className="lx-grid" style={{ gridTemplateColumns: "repeat(3, 1fr)", marginBottom: "1.2rem" }}>
-        <KpiCard label="VPL (Valor Presente Líquido)" value={fmtBrl(kpis.vpl)} color={COLOR.GREEN}
-          sub={`Taxa VPL: ${fmtPct(kpis.taxaVpl * 100, 1)}`} subColor={COLOR.GRAY_MID} />
-        <KpiCard label="TIR (Taxa Interna de Retorno)" value={fmtPct(kpis.tirAa * 100, 1)} color={COLOR.GREEN}
-          sub={`${fmtPct(kpis.tirAm * 100, 2)} a.m. · a.a.`} subColor={COLOR.GRAY_MID} />
-        <KpiCard label="Payback" value={`${kpis.payback} meses`} color={COLOR.INDIGO}
+        <KpiCard label="VPL (Valor Presente Líquido)" value={fmtBrl(p.kpis.vpl)} color={COLOR.GREEN}
+          sub={`Taxa VPL: ${fmtPct(p.kpis.taxaVpl * 100, 1)}`} subColor={COLOR.GRAY_MID} />
+        <KpiCard label="TIR (Taxa Interna de Retorno)" value={fmtPct(p.kpis.tirAa * 100, 1)} color={COLOR.GREEN}
+          sub={`${fmtPct(p.kpis.tirAm * 100, 2)} a.m. · a.a.`} subColor={COLOR.GRAY_MID} />
+        <KpiCard label="Payback" value={`${p.kpis.payback} meses`} color={COLOR.INDIGO}
           sub="Retorno do investimento" subColor={COLOR.GRAY_MID} />
-        <KpiCard label="Capital de Giro" value={fmtBrl(kpis.capitalGiro)} color={COLOR.RED} />
-        <KpiCard label="Investimento Inicial" value={fmtBrl(kpis.investimento)} color={COLOR.RED} />
-        <KpiCard label="Necessidade de Capital Total" value={fmtBrl(kpis.necessidade)} color={COLOR.RED}
+        <KpiCard label="Capital de Giro" value={fmtBrl(p.kpis.capitalGiro)} color={COLOR.RED} />
+        <KpiCard label="Investimento Inicial" value={fmtBrl(p.kpis.investimento)} color={COLOR.RED} />
+        <KpiCard label="Necessidade de Capital Total" value={fmtBrl(p.kpis.necessidade)} color={COLOR.RED}
           sub="Investimento + Capital de Giro" subColor={COLOR.GRAY_MID} />
       </div>
 
       <div className="lx-grid" style={{ gridTemplateColumns: "repeat(2, 1fr)", gap: "1rem", marginBottom: "1rem" }}>
-        <ChartBox><PlotlyChart {...chartFluxoCaixaAcumulado()} height={400} /></ChartBox>
-        <ChartBox><PlotlyChart {...chartFaturamento()} height={400} /></ChartBox>
-        <ChartBox><PlotlyChart {...chartLucratividade()} height={400} /></ChartBox>
-        <ChartBox><PlotlyChart {...chartRentabilidade()} height={400} /></ChartBox>
+        <ChartBox><PlotlyChart {...chartFluxoCaixaAcumulado(p)} height={380} /></ChartBox>
+        <ChartBox><PlotlyChart {...chartFaturamento(p)} height={380} /></ChartBox>
+        <ChartBox><PlotlyChart {...chartLucratividade(p)} height={380} /></ChartBox>
+        <ChartBox><PlotlyChart {...chartRentabilidade(p)} height={380} /></ChartBox>
       </div>
 
       <SecHeader>📋 Resumo por Período (média mensal)</SecHeader>
@@ -103,28 +110,28 @@ function Resumo() {
 }
 
 // ─── Investimento Inicial ──────────────────────────────────────────────────
-function Investimento() {
+function Investimento({ p }: { p: Projeto }) {
   const cols: Column[] = [
     { key: "item", label: "Item" },
     { key: "valor", label: "Valor", align: "right" },
     { key: "pct", label: "% do Total", align: "right", style: () => ({ color: COLOR.GRAY_MID }) },
   ];
-  const rows = investimento.map((i) => ({ item: i.label, valor: fmtBrl(i.valor), pct: fmtPct(i.pct) }));
-  rows.push({ item: "TOTAL", valor: fmtBrl(investimentoTotal), pct: "100%" });
+  const rows: Record<string, any>[] = p.investimento.map((i) => ({ item: i.label, valor: fmtBrl(i.valor), pct: fmtPct(i.pct) }));
+  rows.push({ item: "TOTAL", valor: fmtBrl(p.investimentoTotal), pct: "100%" });
+  cols[0].style = (r) => (r.item === "TOTAL" ? { fontWeight: 700 } : {});
 
   return (
     <div>
       <InfoBox style={{ marginBottom: "1rem" }}>
-        🏗️ Composição do capital necessário para implantar a unidade. O percentual é
-        calculado sobre a Necessidade de Capital Total ({fmtBrl(Math.abs(kpis.necessidade))}).
+        🏗️ Composição do capital de implantação da unidade ({fmtBrl(p.investimentoTotal)}).
       </InfoBox>
       <div className="lx-grid" style={{ gridTemplateColumns: "repeat(3, 1fr)", marginBottom: "1.2rem" }}>
-        <KpiCard label="Investimento em Implantação" value={fmtBrl(investimentoTotal)} color={COLOR.INDIGO} />
-        <KpiCard label="Capital de Giro" value={fmtBrl(kpis.capitalGiro)} color={COLOR.RED} />
-        <KpiCard label="Necessidade de Capital Total" value={fmtBrl(kpis.necessidade)} color={COLOR.RED} />
+        <KpiCard label="Investimento em Implantação" value={fmtBrl(p.investimentoTotal)} color={COLOR.INDIGO} />
+        <KpiCard label="Capital de Giro" value={fmtBrl(p.kpis.capitalGiro)} color={COLOR.RED} />
+        <KpiCard label="Necessidade de Capital Total" value={fmtBrl(p.kpis.necessidade)} color={COLOR.RED} />
       </div>
       <div className="lx-grid" style={{ gridTemplateColumns: "1fr 1fr", gap: "1rem" }}>
-        <ChartBox><PlotlyChart {...chartInvestimentoPie()} height={400} /></ChartBox>
+        <ChartBox><PlotlyChart {...chartInvestimentoPie(p)} height={400} /></ChartBox>
         <ChartBox><DataTable columns={cols} rows={rows} /></ChartBox>
       </div>
     </div>
@@ -132,53 +139,53 @@ function Investimento() {
 }
 
 // ─── Despesas Fixas ────────────────────────────────────────────────────────
-function Despesas() {
+function Despesas({ p }: { p: Projeto }) {
   const cols: Column[] = [{ key: "item", label: "Descrição" }, ...ANO_COLS];
-  const rows = despesasFixas.map((d) => ({
+  const rows: Record<string, any>[] = p.despesasFixas.map((d) => ({
     item: d.label,
     a0: fmtBrl(d.anos[0]), a1: fmtBrl(d.anos[1]), a2: fmtBrl(d.anos[2]),
     a3: fmtBrl(d.anos[3]), a4: fmtBrl(d.anos[4]),
   }));
-  const totalRow: Record<string, any> = {
+  rows.push({
     item: "TOTAL MENSAL",
-    a0: fmtBrl(despesasFixasTotal[0]), a1: fmtBrl(despesasFixasTotal[1]), a2: fmtBrl(despesasFixasTotal[2]),
-    a3: fmtBrl(despesasFixasTotal[3]), a4: fmtBrl(despesasFixasTotal[4]),
-  };
+    a0: fmtBrl(p.despesasFixasTotal[0]), a1: fmtBrl(p.despesasFixasTotal[1]), a2: fmtBrl(p.despesasFixasTotal[2]),
+    a3: fmtBrl(p.despesasFixasTotal[3]), a4: fmtBrl(p.despesasFixasTotal[4]),
+  });
   cols[0].style = (r) => (r.item === "TOTAL MENSAL" ? { fontWeight: 700 } : {});
 
   return (
     <div>
       <InfoBox style={{ marginBottom: "1rem" }}>
-        🧾 Despesas fixas mensais com reajuste anual projetado (valores em R$/mês por ano).
+        🧾 Despesas fixas mensais com reajuste anual projetado (R$/mês por ano).
       </InfoBox>
       <ChartBox style={{ marginBottom: "1rem" }}>
-        <PlotlyChart {...chartDespesasEvolucao()} height={400} />
+        <PlotlyChart {...chartDespesasEvolucao(p)} height={380} />
       </ChartBox>
       <SecHeader>Detalhamento por linha</SecHeader>
-      <ChartBox><DataTable columns={cols} rows={[...rows, totalRow]} maxHeight={520} /></ChartBox>
+      <ChartBox><DataTable columns={cols} rows={rows} maxHeight={520} /></ChartBox>
     </div>
   );
 }
 
 // ─── Recursos Humanos ──────────────────────────────────────────────────────
-function RecursosHumanos() {
+function RecursosHumanos({ p }: { p: Projeto }) {
   const cargoCols: Column[] = [
     { key: "cargo", label: "Cargo" },
     { key: "qtd", label: "Qtde", align: "right" },
     { key: "sal", label: "Salário Base", align: "right" },
     { key: "total", label: "Custo Total (c/ encargos)", align: "right" },
   ];
-  const cargoRows = rhCargos
+  const cargoRows = p.rhCargos
     .filter((c) => c.qtd > 0)
     .map((c) => ({ cargo: c.cargo, qtd: c.qtd, sal: fmtBrl(c.salario), total: fmtBrl(c.total) }));
 
   const anoCols: Column[] = [{ key: "item", label: "" }, ...ANO_COLS];
-  const anoRows = [
-    { item: "Quadro (nº pessoas)", a0: rhQtd[0], a1: rhQtd[1], a2: rhQtd[2], a3: rhQtd[3], a4: rhQtd[4] },
+  const anoRows: Record<string, any>[] = [
+    { item: "Quadro (nº pessoas)", a0: p.rhQtd[0], a1: p.rhQtd[1], a2: p.rhQtd[2], a3: p.rhQtd[3], a4: p.rhQtd[4] },
     {
       item: "Folha mensal total",
-      a0: fmtBrl(rhTotalMensal[0]), a1: fmtBrl(rhTotalMensal[1]), a2: fmtBrl(rhTotalMensal[2]),
-      a3: fmtBrl(rhTotalMensal[3]), a4: fmtBrl(rhTotalMensal[4]),
+      a0: fmtBrl(p.rhTotalMensal[0]), a1: fmtBrl(p.rhTotalMensal[1]), a2: fmtBrl(p.rhTotalMensal[2]),
+      a3: fmtBrl(p.rhTotalMensal[3]), a4: fmtBrl(p.rhTotalMensal[4]),
     },
   ];
 
@@ -188,12 +195,12 @@ function RecursosHumanos() {
         👥 Estrutura de pessoal e custo de folha (salários + encargos + benefícios).
       </InfoBox>
       <div className="lx-grid" style={{ gridTemplateColumns: "repeat(3, 1fr)", marginBottom: "1.2rem" }}>
-        <KpiCard label="Quadro inicial (Ano 1)" value={`${rhQtd[0]} pessoas`} color={COLOR.INDIGO} />
-        <KpiCard label="Folha mensal (Ano 1)" value={fmtBrl(rhTotalMensal[0])} color={COLOR.ORANGE} />
-        <KpiCard label="Folha mensal (Ano 5)" value={fmtBrl(rhTotalMensal[4])} color={COLOR.ORANGE} />
+        <KpiCard label="Quadro inicial (Ano 1)" value={`${p.rhQtd[0]} pessoas`} color={COLOR.INDIGO} />
+        <KpiCard label="Folha mensal (Ano 1)" value={fmtBrl(p.rhTotalMensal[0])} color={COLOR.ORANGE} />
+        <KpiCard label="Folha mensal (Ano 5)" value={fmtBrl(p.rhTotalMensal[4])} color={COLOR.ORANGE} />
       </div>
       <ChartBox style={{ marginBottom: "1rem" }}>
-        <PlotlyChart {...chartRhEvolucao()} height={400} />
+        <PlotlyChart {...chartRhEvolucao(p)} height={380} />
       </ChartBox>
       <SecHeader>Quadro inicial (Ano 1)</SecHeader>
       <ChartBox style={{ marginBottom: "1rem" }}><DataTable columns={cargoCols} rows={cargoRows} /></ChartBox>
@@ -204,17 +211,14 @@ function RecursosHumanos() {
 }
 
 // ─── DRE Anual ─────────────────────────────────────────────────────────────
-function Dre() {
+function Dre({ p }: { p: Projeto }) {
   const cols: Column[] = [{ key: "linha", label: "Demonstrativo (R$/ano)" }, ...ANO_COLS];
-  const rows = dreAnual.map((d) => {
-    const isResult = d.label.startsWith("(=)");
-    return {
-      linha: d.label,
-      a0: fmtBrl(d.anos[0]), a1: fmtBrl(d.anos[1]), a2: fmtBrl(d.anos[2]),
-      a3: fmtBrl(d.anos[3]), a4: fmtBrl(d.anos[4]),
-      _r: isResult,
-    };
-  });
+  const rows: Record<string, any>[] = p.dreAnual.map((d) => ({
+    linha: d.label,
+    a0: fmtBrl(d.anos[0]), a1: fmtBrl(d.anos[1]), a2: fmtBrl(d.anos[2]),
+    a3: fmtBrl(d.anos[3]), a4: fmtBrl(d.anos[4]),
+    _r: d.label.startsWith("(="),
+  }));
   cols.forEach((c) => {
     c.style = (r) => (r._r ? { fontWeight: 700, color: r.linha.includes("Lucro") ? COLOR.INDIGO : COLOR.GRAY_DARK } : {});
   });
@@ -226,7 +230,7 @@ function Dre() {
         equivale ao lucro líquido projetado do franqueado.
       </InfoBox>
       <ChartBox style={{ marginBottom: "1rem" }}>
-        <PlotlyChart {...chartDreAnual()} height={420} />
+        <PlotlyChart {...chartDreAnual(p)} height={420} />
       </ChartBox>
       <SecHeader>DRE consolidado (R$/ano)</SecHeader>
       <ChartBox><DataTable columns={cols} rows={rows} /></ChartBox>
