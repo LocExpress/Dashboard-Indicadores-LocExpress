@@ -1,53 +1,141 @@
 "use client";
-import { useState } from "react";
-import { SecHeader, KpiCard, ChartBox, DataTable, InfoBox, BodySelect, type Column } from "../ui";
+import { useState, type ReactNode, type CSSProperties } from "react";
+import { DataTable, type Column } from "../ui";
 import PlotlyChart from "../charts/PlotlyChart";
 import {
   chartFluxoCaixaAcumulado, chartFaturamento, chartLucratividade, chartRentabilidade,
   chartInvestimentoPie, chartDespesasEvolucao, chartRhEvolucao, chartDreAnual,
 } from "../charts/viabilidade";
-import { COLOR } from "@/lib/theme";
 import { fmtBrl, fmtPct } from "@/lib/format";
 import { PROJETOS, ANOS, type Projeto } from "@/lib/viabilidadeData";
 
+// ─── Paleta executiva ──────────────────────────────────────────────────────
+const C = {
+  blue: "#2F3192", orange: "#F5781C", green: "#00B050", red: "#FF3B30",
+  ink: "#1F2440", mid: "#6B7280", soft: "#9097A8",
+};
+
 const SUBTABS = [
-  { id: "resumo", label: "📊  Resumo" },
-  { id: "invest", label: "🏗️  Investimento Inicial" },
-  { id: "despesas", label: "🧾  Despesas Fixas" },
-  { id: "rh", label: "👥  Recursos Humanos" },
-  { id: "dre", label: "📑  DRE Anual" },
+  { id: "resumo", label: "Resumo", icon: "grid" },
+  { id: "invest", label: "Investimento Inicial", icon: "wallet" },
+  { id: "despesas", label: "Despesas Fixas", icon: "receipt" },
+  { id: "rh", label: "Recursos Humanos", icon: "users" },
+  { id: "dre", label: "DRE Anual", icon: "doc" },
 ] as const;
 type SubId = (typeof SUBTABS)[number]["id"];
 
 const ANO_COLS: Column[] = ANOS.map((a, i) => ({ key: `a${i}`, label: a, align: "right" as const }));
 
+// ─── Ícones (SVG inline, sem dependência) ──────────────────────────────────
+function Icon({ name, size = 18 }: { name: string; size?: number }) {
+  const common = { width: size, height: size, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: 2, strokeLinecap: "round" as const, strokeLinejoin: "round" as const };
+  const paths: Record<string, ReactNode> = {
+    trendingUp: <><polyline points="22 7 13.5 15.5 8.5 10.5 2 17" /><polyline points="16 7 22 7 22 13" /></>,
+    percent: <><line x1="19" y1="5" x2="5" y2="19" /><circle cx="6.5" cy="6.5" r="2.5" /><circle cx="17.5" cy="17.5" r="2.5" /></>,
+    clock: <><circle cx="12" cy="12" r="9" /><polyline points="12 7 12 12 15.5 14" /></>,
+    refresh: <><polyline points="21 3 21 9 15 9" /><path d="M21 9a9 9 0 1 0-2.6 6.4" /></>,
+    wallet: <><path d="M3 7a2 2 0 0 1 2-2h13a1 1 0 0 1 1 1v2" /><path d="M3 7v10a2 2 0 0 0 2 2h14a1 1 0 0 0 1-1v-3" /><path d="M16 13a2 2 0 0 0 0 4h5v-4z" /></>,
+    layers: <><polygon points="12 2 22 8.5 12 15 2 8.5 12 2" /><polyline points="2 15.5 12 22 22 15.5" /></>,
+    grid: <><rect x="3" y="3" width="7" height="7" rx="1" /><rect x="14" y="3" width="7" height="7" rx="1" /><rect x="3" y="14" width="7" height="7" rx="1" /><rect x="14" y="14" width="7" height="7" rx="1" /></>,
+    receipt: <><path d="M5 3v18l2-1.4 2 1.4 2-1.4 2 1.4 2-1.4 2 1.4V3l-2 1.4L15 3l-2 1.4L11 3 9 4.4 7 3z" /><line x1="8" y1="9" x2="16" y2="9" /><line x1="8" y1="13" x2="14" y2="13" /></>,
+    users: <><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M22 21v-2a4 4 0 0 0-3-3.87" /></>,
+    doc: <><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /><line x1="8" y1="13" x2="16" y2="13" /><line x1="8" y1="17" x2="13" y2="17" /></>,
+    filter: <><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" /></>,
+    insight: <><path d="M9 18h6" /><path d="M10 22h4" /><path d="M12 2a7 7 0 0 0-4 12.7c.6.5 1 1.3 1 2.1h6c0-.8.4-1.6 1-2.1A7 7 0 0 0 12 2z" /></>,
+  };
+  return <svg {...common} aria-hidden>{paths[name]}</svg>;
+}
+
+// ─── KPI card executivo ─────────────────────────────────────────────────────
+function Kpi({ label, value, sub, accent, icon }: { label: string; value: string; sub?: string; accent: string; icon: string }) {
+  return (
+    <div className="viab-kpi" style={{ "--accent": accent } as CSSProperties}>
+      <div className="viab-kpi-top">
+        <div className="viab-kpi-label">{label}</div>
+        <div className="viab-kpi-icon" style={{ background: `${accent}1F`, color: accent }}><Icon name={icon} /></div>
+      </div>
+      <div className="viab-kpi-value" style={{ color: accent }}>{value}</div>
+      {sub && <div className="viab-kpi-sub">{sub}</div>}
+    </div>
+  );
+}
+
+// ─── Painel de gráfico ──────────────────────────────────────────────────────
+function Panel({ title, sub, span, height = 320, children }: { title: string; sub?: string; span?: boolean; height?: number; children: ReactNode }) {
+  return (
+    <div className={`viab-panel${span ? " span-2" : ""}`}>
+      <div className="viab-panel-head">
+        <div className="viab-panel-title">{title}</div>
+        {sub && <div className="viab-panel-sub">{sub}</div>}
+      </div>
+      <div style={{ height }}>{children}</div>
+    </div>
+  );
+}
+
+// ─── Slicer (filtro estilo Power BI) ────────────────────────────────────────
+function Slicer({ label, value, options, onChange, disabled, soon }: {
+  label: string; value?: string; options?: { value: string; label: string }[];
+  onChange?: (v: string) => void; disabled?: boolean; soon?: boolean;
+}) {
+  return (
+    <div className="viab-slicer">
+      <span className="viab-slicer-label">
+        <Icon name="filter" size={12} /> {label} {soon && <span className="viab-soon">em breve</span>}
+      </span>
+      <select className="viab-select" value={value ?? ""} disabled={disabled} onChange={(e) => onChange?.(e.target.value)}>
+        {disabled && <option>Todos</option>}
+        {options?.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+      </select>
+    </div>
+  );
+}
+
 export default function ViabilidadePage() {
   const [slug, setSlug] = useState<string>(PROJETOS[0].slug);
   const [sub, setSub] = useState<SubId>("resumo");
   const p = PROJETOS.find((x) => x.slug === slug) ?? PROJETOS[0];
+  const vplPos = p.kpis.vpl >= 0;
 
   return (
-    <div>
-      <SecHeader>💼 Viabilidade Financeira</SecHeader>
-
-      <div className="chart-box" style={{ padding: "0.9rem 1.2rem", marginBottom: "1rem", display: "flex", flexWrap: "wrap", gap: "1.5rem", alignItems: "flex-end" }}>
-        <div style={{ minWidth: 280 }}>
-          <BodySelect
-            label="Projeto"
-            value={slug}
-            options={PROJETOS.map((x) => ({ value: x.slug, label: x.nome }))}
-            onChange={setSlug}
-          />
-        </div>
-        <div style={{ color: COLOR.GRAY_MID, fontSize: "0.85rem", paddingBottom: 6 }}>
-          Simulação dos resultados do franqueado em 5 anos · valores em R$
+    <div className="viab">
+      {/* Título */}
+      <div className="viab-title-row">
+        <span className="viab-title-bar" />
+        <div>
+          <h2>Viabilidade Financeira</h2>
+          <div className="viab-title-sub">LocHub · LocExpress Franchising — simulação de resultados em 5 anos</div>
         </div>
       </div>
 
-      <div className="lx-tabs" style={{ marginBottom: "1rem" }}>
+      {/* Resumo executivo */}
+      <div className="viab-summary">
+        <div className="viab-summary-icon"><Icon name="insight" size={24} /></div>
+        <div>
+          <div className="viab-summary-label">Leitura executiva</div>
+          <div className="viab-summary-text">
+            <b>{p.nome}</b> apresenta retorno estimado em <b>{p.kpis.payback} meses</b>,
+            TIR de <b>{fmtPct(p.kpis.tirAa * 100, 1)}</b> a.a. e VPL {vplPos ? "positivo" : "negativo"} de{" "}
+            <b>{fmtBrl(p.kpis.vpl)}</b>. No 5º ano, a lucratividade projetada chega a{" "}
+            <b>{fmtPct(p.lucratividade[4])}</b> sobre o faturamento.
+          </div>
+        </div>
+      </div>
+
+      {/* Filtros / slicers */}
+      <div className="viab-filterbar">
+        <Slicer label="Projeto" value={slug} options={PROJETOS.map((x) => ({ value: x.slug, label: x.nome }))} onChange={setSlug} />
+        <Slicer label="Ano" disabled soon />
+        <Slicer label="Cenário" disabled soon />
+        <Slicer label="Tipo de Projeto" disabled soon />
+        <Slicer label="Unidade" disabled soon />
+      </div>
+
+      {/* Navegação segmentada */}
+      <div className="viab-seg">
         {SUBTABS.map((t) => (
-          <button key={t.id} className={`lx-tab${t.id === sub ? " active" : ""}`} onClick={() => setSub(t.id)}>
-            {t.label}
+          <button key={t.id} className={`viab-seg-btn${t.id === sub ? " active" : ""}`} onClick={() => setSub(t.id)}>
+            <Icon name={t.icon} size={15} /> {t.label}
           </button>
         ))}
       </div>
@@ -67,11 +155,11 @@ function Resumo({ p }: { p: Projeto }) {
     { key: "ano", label: "Período" },
     { key: "fat", label: "Faturamento Médio Mensal", align: "right" },
     { key: "lucro", label: "Lucro Líquido Médio Mensal", align: "right",
-      style: (r) => ({ color: r.lucroNum < 0 ? COLOR.RED : COLOR.GRAY_DARK, fontWeight: 600 }) },
+      style: (r) => ({ color: r.lucroNum < 0 ? C.red : C.ink, fontWeight: 600 }) },
     { key: "lucrat", label: "Lucratividade", align: "right",
-      style: (r) => ({ color: r.lucratNum < 0 ? COLOR.RED : COLOR.INDIGO }) },
+      style: (r) => ({ color: r.lucratNum < 0 ? C.red : C.blue }) },
     { key: "rent", label: "Rentabilidade", align: "right",
-      style: (r) => ({ color: r.rentNum < 0 ? COLOR.RED : COLOR.BLUE_DARK }) },
+      style: (r) => ({ color: r.rentNum < 0 ? C.red : C.green }) },
   ];
   const tableRows = ANOS.map((ano, i) => ({
     ano,
@@ -83,28 +171,37 @@ function Resumo({ p }: { p: Projeto }) {
 
   return (
     <div>
-      <div className="lx-grid" style={{ gridTemplateColumns: "repeat(3, 1fr)", marginBottom: "1.2rem" }}>
-        <KpiCard label="VPL (Valor Presente Líquido)" value={fmtBrl(p.kpis.vpl)} color={COLOR.GREEN}
-          sub={`Taxa VPL: ${fmtPct(p.kpis.taxaVpl * 100, 1)}`} subColor={COLOR.GRAY_MID} />
-        <KpiCard label="TIR (Taxa Interna de Retorno)" value={fmtPct(p.kpis.tirAa * 100, 1)} color={COLOR.GREEN}
-          sub={`${fmtPct(p.kpis.tirAm * 100, 2)} a.m. · a.a.`} subColor={COLOR.GRAY_MID} />
-        <KpiCard label="Payback" value={`${p.kpis.payback} meses`} color={COLOR.INDIGO}
-          sub="Retorno do investimento" subColor={COLOR.GRAY_MID} />
-        <KpiCard label="Capital de Giro" value={fmtBrl(p.kpis.capitalGiro)} color={COLOR.RED} />
-        <KpiCard label="Investimento Inicial" value={fmtBrl(p.kpis.investimento)} color={COLOR.RED} />
-        <KpiCard label="Necessidade de Capital Total" value={fmtBrl(p.kpis.necessidade)} color={COLOR.RED}
-          sub="Investimento + Capital de Giro" subColor={COLOR.GRAY_MID} />
+      <div className="viab-kpis">
+        <Kpi label="VPL · Valor Presente Líquido" value={fmtBrl(p.kpis.vpl)} sub={`Taxa VPL ${fmtPct(p.kpis.taxaVpl * 100, 1)}`} accent={p.kpis.vpl >= 0 ? C.green : C.red} icon="trendingUp" />
+        <Kpi label="TIR · Taxa Interna de Retorno" value={fmtPct(p.kpis.tirAa * 100, 1)} sub={`${fmtPct(p.kpis.tirAm * 100, 2)} ao mês`} accent={C.green} icon="percent" />
+        <Kpi label="Payback" value={`${p.kpis.payback} meses`} sub="Tempo de retorno do investimento" accent={C.blue} icon="clock" />
+        <Kpi label="Capital de Giro" value={fmtBrl(p.kpis.capitalGiro)} sub="Capital operacional necessário" accent={C.red} icon="refresh" />
+        <Kpi label="Investimento Inicial" value={fmtBrl(p.kpis.investimento)} sub="Implantação da unidade" accent={C.red} icon="wallet" />
+        <Kpi label="Necessidade de Capital Total" value={fmtBrl(p.kpis.necessidade)} sub="Investimento + capital de giro" accent={C.red} icon="layers" />
       </div>
 
-      <div className="lx-grid" style={{ gridTemplateColumns: "repeat(2, 1fr)", gap: "1rem", marginBottom: "1rem" }}>
-        <ChartBox><PlotlyChart {...chartFluxoCaixaAcumulado(p)} height={380} /></ChartBox>
-        <ChartBox><PlotlyChart {...chartFaturamento(p)} height={380} /></ChartBox>
-        <ChartBox><PlotlyChart {...chartLucratividade(p)} height={380} /></ChartBox>
-        <ChartBox><PlotlyChart {...chartRentabilidade(p)} height={380} /></ChartBox>
+      <div className="viab-grid viab-grid-2" style={{ marginBottom: "1rem" }}>
+        <Panel span title="Fluxo de Caixa Acumulado" sub="Saldo acumulado de caixa ao longo de 60 meses" height={360}>
+          <PlotlyChart {...chartFluxoCaixaAcumulado(p)} height={360} />
+        </Panel>
+        <Panel title="Faturamento Bruto Médio Mensal" sub="Média mensal por ano de operação">
+          <PlotlyChart {...chartFaturamento(p)} height={320} />
+        </Panel>
+        <Panel title="Evolução da Lucratividade" sub="Lucro líquido mensal e % sobre o faturamento">
+          <PlotlyChart {...chartLucratividade(p)} height={320} />
+        </Panel>
+        <Panel title="Evolução da Rentabilidade" sub="Lucro líquido mensal e retorno % sobre o capital">
+          <PlotlyChart {...chartRentabilidade(p)} height={320} />
+        </Panel>
+        <Panel title="DRE Anual" sub="Receita × despesas operacionais × lucro">
+          <PlotlyChart {...chartDreAnual(p)} height={320} />
+        </Panel>
       </div>
 
-      <SecHeader>📋 Resumo por Período (média mensal)</SecHeader>
-      <ChartBox><DataTable columns={tableCols} rows={tableRows} /></ChartBox>
+      <div className="viab-panel">
+        <div className="viab-panel-head"><div className="viab-panel-title">Resumo por Período</div><div className="viab-panel-sub">Médias mensais por ano</div></div>
+        <DataTable columns={tableCols} rows={tableRows} />
+      </div>
     </div>
   );
 }
@@ -114,7 +211,7 @@ function Investimento({ p }: { p: Projeto }) {
   const cols: Column[] = [
     { key: "item", label: "Item" },
     { key: "valor", label: "Valor", align: "right" },
-    { key: "pct", label: "% do Total", align: "right", style: () => ({ color: COLOR.GRAY_MID }) },
+    { key: "pct", label: "% do Total", align: "right", style: () => ({ color: C.mid }) },
   ];
   const rows: Record<string, any>[] = p.investimento.map((i) => ({ item: i.label, valor: fmtBrl(i.valor), pct: fmtPct(i.pct) }));
   rows.push({ item: "TOTAL", valor: fmtBrl(p.investimentoTotal), pct: "100%" });
@@ -122,17 +219,19 @@ function Investimento({ p }: { p: Projeto }) {
 
   return (
     <div>
-      <InfoBox style={{ marginBottom: "1rem" }}>
-        🏗️ Composição do capital de implantação da unidade ({fmtBrl(p.investimentoTotal)}).
-      </InfoBox>
-      <div className="lx-grid" style={{ gridTemplateColumns: "repeat(3, 1fr)", marginBottom: "1.2rem" }}>
-        <KpiCard label="Investimento em Implantação" value={fmtBrl(p.investimentoTotal)} color={COLOR.INDIGO} />
-        <KpiCard label="Capital de Giro" value={fmtBrl(p.kpis.capitalGiro)} color={COLOR.RED} />
-        <KpiCard label="Necessidade de Capital Total" value={fmtBrl(p.kpis.necessidade)} color={COLOR.RED} />
+      <div className="viab-kpis">
+        <Kpi label="Investimento em Implantação" value={fmtBrl(p.investimentoTotal)} sub="Soma dos itens de implantação" accent={C.blue} icon="wallet" />
+        <Kpi label="Capital de Giro" value={fmtBrl(p.kpis.capitalGiro)} sub="Capital operacional" accent={C.red} icon="refresh" />
+        <Kpi label="Necessidade de Capital Total" value={fmtBrl(p.kpis.necessidade)} sub="Investimento + capital de giro" accent={C.red} icon="layers" />
       </div>
-      <div className="lx-grid" style={{ gridTemplateColumns: "1fr 1fr", gap: "1rem" }}>
-        <ChartBox><PlotlyChart {...chartInvestimentoPie(p)} height={400} /></ChartBox>
-        <ChartBox><DataTable columns={cols} rows={rows} /></ChartBox>
+      <div className="viab-grid viab-grid-2">
+        <Panel title="Composição do Investimento" sub="Distribuição por categoria" height={400}>
+          <PlotlyChart {...chartInvestimentoPie(p)} height={400} />
+        </Panel>
+        <div className="viab-panel">
+          <div className="viab-panel-head"><div className="viab-panel-title">Detalhamento</div><div className="viab-panel-sub">Itens do investimento inicial</div></div>
+          <DataTable columns={cols} rows={rows} />
+        </div>
       </div>
     </div>
   );
@@ -155,14 +254,13 @@ function Despesas({ p }: { p: Projeto }) {
 
   return (
     <div>
-      <InfoBox style={{ marginBottom: "1rem" }}>
-        🧾 Despesas fixas mensais com reajuste anual projetado (R$/mês por ano).
-      </InfoBox>
-      <ChartBox style={{ marginBottom: "1rem" }}>
-        <PlotlyChart {...chartDespesasEvolucao(p)} height={380} />
-      </ChartBox>
-      <SecHeader>Detalhamento por linha</SecHeader>
-      <ChartBox><DataTable columns={cols} rows={rows} maxHeight={520} /></ChartBox>
+      <Panel title="Despesas Fixas Mensais por Ano" sub="Total mensal com reajuste anual projetado" height={340}>
+        <PlotlyChart {...chartDespesasEvolucao(p)} height={340} />
+      </Panel>
+      <div className="viab-panel" style={{ marginTop: "1rem" }}>
+        <div className="viab-panel-head"><div className="viab-panel-title">Detalhamento por linha</div><div className="viab-panel-sub">Valores em R$/mês por ano</div></div>
+        <DataTable columns={cols} rows={rows} maxHeight={520} />
+      </div>
     </div>
   );
 }
@@ -175,9 +273,7 @@ function RecursosHumanos({ p }: { p: Projeto }) {
     { key: "sal", label: "Salário Base", align: "right" },
     { key: "total", label: "Custo Total (c/ encargos)", align: "right" },
   ];
-  const cargoRows = p.rhCargos
-    .filter((c) => c.qtd > 0)
-    .map((c) => ({ cargo: c.cargo, qtd: c.qtd, sal: fmtBrl(c.salario), total: fmtBrl(c.total) }));
+  const cargoRows = p.rhCargos.filter((c) => c.qtd > 0).map((c) => ({ cargo: c.cargo, qtd: c.qtd, sal: fmtBrl(c.salario), total: fmtBrl(c.total) }));
 
   const anoCols: Column[] = [{ key: "item", label: "" }, ...ANO_COLS];
   const anoRows: Record<string, any>[] = [
@@ -191,21 +287,24 @@ function RecursosHumanos({ p }: { p: Projeto }) {
 
   return (
     <div>
-      <InfoBox style={{ marginBottom: "1rem" }}>
-        👥 Estrutura de pessoal e custo de folha (salários + encargos + benefícios).
-      </InfoBox>
-      <div className="lx-grid" style={{ gridTemplateColumns: "repeat(3, 1fr)", marginBottom: "1.2rem" }}>
-        <KpiCard label="Quadro inicial (Ano 1)" value={`${p.rhQtd[0]} pessoas`} color={COLOR.INDIGO} />
-        <KpiCard label="Folha mensal (Ano 1)" value={fmtBrl(p.rhTotalMensal[0])} color={COLOR.ORANGE} />
-        <KpiCard label="Folha mensal (Ano 5)" value={fmtBrl(p.rhTotalMensal[4])} color={COLOR.ORANGE} />
+      <div className="viab-kpis">
+        <Kpi label="Quadro Inicial (Ano 1)" value={`${p.rhQtd[0]} pessoas`} sub="Colaboradores na abertura" accent={C.blue} icon="users" />
+        <Kpi label="Folha Mensal (Ano 1)" value={fmtBrl(p.rhTotalMensal[0])} sub="Salários + encargos + benefícios" accent={C.orange} icon="wallet" />
+        <Kpi label="Folha Mensal (Ano 5)" value={fmtBrl(p.rhTotalMensal[4])} sub="Projeção no 5º ano" accent={C.orange} icon="trendingUp" />
       </div>
-      <ChartBox style={{ marginBottom: "1rem" }}>
-        <PlotlyChart {...chartRhEvolucao(p)} height={380} />
-      </ChartBox>
-      <SecHeader>Quadro inicial (Ano 1)</SecHeader>
-      <ChartBox style={{ marginBottom: "1rem" }}><DataTable columns={cargoCols} rows={cargoRows} /></ChartBox>
-      <SecHeader>Evolução do quadro e da folha</SecHeader>
-      <ChartBox><DataTable columns={anoCols} rows={anoRows} /></ChartBox>
+      <Panel title="Custo de Pessoal Mensal por Ano" sub="Evolução da folha de pagamento" height={340}>
+        <PlotlyChart {...chartRhEvolucao(p)} height={340} />
+      </Panel>
+      <div className="viab-grid viab-grid-2" style={{ marginTop: "1rem" }}>
+        <div className="viab-panel">
+          <div className="viab-panel-head"><div className="viab-panel-title">Quadro Inicial (Ano 1)</div><div className="viab-panel-sub">Cargos e custo individual</div></div>
+          <DataTable columns={cargoCols} rows={cargoRows} />
+        </div>
+        <div className="viab-panel">
+          <div className="viab-panel-head"><div className="viab-panel-title">Evolução do Quadro e da Folha</div><div className="viab-panel-sub">Por ano de operação</div></div>
+          <DataTable columns={anoCols} rows={anoRows} />
+        </div>
+      </div>
     </div>
   );
 }
@@ -220,20 +319,18 @@ function Dre({ p }: { p: Projeto }) {
     _r: d.label.startsWith("(="),
   }));
   cols.forEach((c) => {
-    c.style = (r) => (r._r ? { fontWeight: 700, color: r.linha.includes("Lucro") ? COLOR.INDIGO : COLOR.GRAY_DARK } : {});
+    c.style = (r) => (r._r ? { fontWeight: 700, color: r.linha.includes("Lucro") ? C.blue : C.ink } : {});
   });
 
   return (
     <div>
-      <InfoBox style={{ marginBottom: "1rem" }}>
-        📑 Demonstrativo de Resultados (DRE) consolidado por ano. O Lucro Operacional
-        equivale ao lucro líquido projetado do franqueado.
-      </InfoBox>
-      <ChartBox style={{ marginBottom: "1rem" }}>
+      <Panel title="DRE Anual — Receita × Despesas × Lucro" sub="Demonstrativo de resultados consolidado por ano" height={420}>
         <PlotlyChart {...chartDreAnual(p)} height={420} />
-      </ChartBox>
-      <SecHeader>DRE consolidado (R$/ano)</SecHeader>
-      <ChartBox><DataTable columns={cols} rows={rows} /></ChartBox>
+      </Panel>
+      <div className="viab-panel" style={{ marginTop: "1rem" }}>
+        <div className="viab-panel-head"><div className="viab-panel-title">DRE Consolidado</div><div className="viab-panel-sub">Valores em R$/ano · o Lucro Operacional equivale ao lucro líquido projetado</div></div>
+        <DataTable columns={cols} rows={rows} />
+      </div>
     </div>
   );
 }
