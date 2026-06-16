@@ -110,7 +110,7 @@ export function ProjetosOverview({ sge, onOpen }: { sge: SgeRow[] | null; onOpen
   return (
     <div>
       {ins ? (
-        <div className="viab-kpis">
+        <div className="viab-kpis cols-4">
           <Kpi label="SGE Geral" value={fmtPct(ins.geral)} sub="Média de aderência dos setores" accent={col(ins.geral)} icon="target" />
           <Kpi label="Melhor Setor" value={ins.best[0]} sub={`${fmtPct(ins.best[1])} de aderência`} accent={C.green} icon="check" />
           <Kpi label="Setor em Atenção" value={ins.worst[0]} sub={`${fmtPct(ins.worst[1])} de aderência`} accent={col(ins.worst[1])} icon="alert" />
@@ -148,7 +148,7 @@ export function FinanceiroOverview({ orc, onOpen }: { orc: OrcRow[] | null; onOp
     <div>
       <div className="area-sec">Orçamento</div>
       {hasOrc ? (
-        <div className="viab-kpis">
+        <div className="viab-kpis cols-4">
           <Kpi label="Orçado (Total)" value={fmtBrl(ins.orcado)} sub="Valor planejado" accent={C.blue} icon="wallet" />
           <Kpi label="Realizado (Total)" value={fmtBrl(ins.real)} sub="Valor executado" accent={C.orange} icon="coins" />
           <Kpi label="Execução" value={ins.exec == null ? "—" : fmtPct(ins.exec)} sub="Realizado ÷ Orçado" accent={ins.exec != null && ins.exec <= 100 ? C.green : C.red} icon="percent" />
@@ -159,7 +159,7 @@ export function FinanceiroOverview({ orc, onOpen }: { orc: OrcRow[] | null; onOp
       )}
 
       <div className="area-sec">Viabilidade Financeira</div>
-      <div className="viab-kpis">
+      <div className="viab-kpis cols-4">
         <Kpi label="Projetos Simulados" value={String(ins.nProj)} sub="Modelos de viabilidade" accent={C.blue} icon="layers" />
         <Kpi label="Maior VPL" value={fmtBrl(ins.best.kpis.vpl)} sub={ins.best.nome} accent={C.green} icon="trendingUp" />
         <Kpi label="TIR (maior VPL)" value={fmtPct(ins.best.kpis.tirAa * 100, 1)} sub={`${ins.best.nome} · a.a.`} accent={C.green} icon="percent" />
