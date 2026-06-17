@@ -83,6 +83,43 @@ export function chartDonut(labels: string[], values: number[]): PlotlyFigure {
   };
 }
 
+// Centróides aproximados dos estados (UF) — para o mapa de bolhas.
+const UF_COORDS: Record<string, [number, number]> = {
+  AC: [-8.77, -70.55], AL: [-9.71, -35.73], AP: [1.41, -51.77], AM: [-3.47, -65.10],
+  BA: [-12.96, -41.50], CE: [-5.20, -39.53], DF: [-15.83, -47.86], ES: [-19.19, -40.34],
+  GO: [-15.98, -49.86], MA: [-5.42, -45.44], MT: [-12.64, -55.42], MS: [-20.51, -54.54],
+  MG: [-18.10, -44.38], PA: [-3.79, -52.48], PB: [-7.28, -36.72], PR: [-24.89, -51.55],
+  PE: [-8.38, -37.86], PI: [-6.60, -42.28], RJ: [-22.25, -42.66], RN: [-5.81, -36.59],
+  RS: [-30.17, -53.50], RO: [-10.83, -63.34], RR: [1.99, -61.33], SC: [-27.45, -50.95],
+  SP: [-22.19, -48.79], SE: [-10.57, -37.45], TO: [-9.46, -48.26],
+};
+
+// Mapa de bolhas (faturamento por estado)
+export function chartMapa(items: [string, number][]): PlotlyFigure {
+  const pts = items.filter(([uf]) => UF_COORDS[uf.toUpperCase()]);
+  const max = Math.max(1, ...pts.map(([, v]) => v));
+  return {
+    data: [{
+      type: "scattergeo", mode: "markers",
+      lat: pts.map(([uf]) => UF_COORDS[uf.toUpperCase()][0]),
+      lon: pts.map(([uf]) => UF_COORDS[uf.toUpperCase()][1]),
+      marker: { size: pts.map(([, v]) => 8 + Math.sqrt(v / max) * 46), color: ORANGE, opacity: 0.72, line: { color: "#fff", width: 1 } },
+      text: pts.map(([uf, v]) => `${uf.toUpperCase()} — ${fmtBrl(v)}`),
+      hovertemplate: "%{text}<extra></extra>",
+    }],
+    layout: {
+      paper_bgcolor: "rgba(0,0,0,0)", margin: { l: 0, r: 0, t: 6, b: 0 },
+      hoverlabel: { bgcolor: "#FFFFFF", bordercolor: GRID, font: { size: 12, color: INK } },
+      geo: {
+        scope: "south america", resolution: 50, showland: true, landcolor: "#EEF0F4",
+        showcountries: true, countrycolor: "#FFFFFF", subunitcolor: "#FFFFFF", showsubunits: true,
+        coastlinecolor: "#D9DCE6", showframe: false, bgcolor: "rgba(0,0,0,0)",
+        lataxis: { range: [-34, 6] }, lonaxis: { range: [-74, -34] },
+      },
+    },
+  };
+}
+
 // Comparação anual: barras (valor) + linha (crescimento % a.a.)
 export function chartAnual(years: string[], values: number[], growth: (number | null)[], barColor = ORANGE): PlotlyFigure {
   return {

@@ -4,7 +4,7 @@ import { Kpi } from "../Kpi";
 import { Slicer, Panel, Segmented } from "../Slicer";
 import { DataTable, type Column } from "../ui";
 import PlotlyChart from "../charts/PlotlyChart";
-import { chartLinhaMensal, chartAnual, chartBarsH, chartBarsV, chartDonut } from "../charts/performance";
+import { chartLinhaMensal, chartAnual, chartBarsH, chartBarsV, chartDonut, chartMapa } from "../charts/performance";
 import { fmtBrl, fmtPct } from "@/lib/format";
 import { MESES_ABBR } from "@/lib/meses";
 import type { FatRow } from "@/lib/faturamento";
@@ -76,6 +76,7 @@ export default function PerformancePage({ data, error }: { data: FatRow[] | null
   }, [df, mensal]);
 
   const porRegiao = useMemo(() => [...groupSum(df, (r) => r.Regiao, (r) => r.Faturamento).entries()].sort((a, b) => b[1] - a[1]), [df]);
+  const porEstado = useMemo(() => [...groupSum(df, (r) => r.Estado, (r) => r.Faturamento).entries()].filter(([k]) => k) as [string, number][], [df]);
   const tktRegiao = useMemo(() => ticket(df, (r) => r.Regiao, (r) => r.Faturamento, (r) => r.Qtd).sort((a, b) => b[1] - a[1]), [df]);
   const tktProjeto = useMemo(() => ticket(df, (r) => r.Projeto, (r) => r.Faturamento, (r) => r.Qtd).sort((a, b) => b[1] - a[1]), [df]);
   const tempoCasa = useMemo(() => [...groupSum(df, (r) => r.TempoImplantacao || "—", (r) => r.Faturamento).entries()].sort((a, b) => b[1] - a[1]), [df]);
@@ -122,8 +123,11 @@ export default function PerformancePage({ data, error }: { data: FatRow[] | null
             ? <PlotlyChart {...chartLinhaMensal(mensal.labels, mensal.values)} height={350} />
             : <PlotlyChart {...chartAnual(anual.years, anual.values, anual.growth)} height={350} />}
         </Panel>
-        <Panel title="Top 10 Unidades" sub="Faturamento acumulado no período" height={360}>
-          <PlotlyChart {...chartBarsH(top10.map(([u]) => semPrefixo(u)), top10.map(([, v]) => v))} height={360} />
+        <Panel title="Faturamento por Estado (Mapa)" sub="Bolhas proporcionais ao faturamento" height={420}>
+          <PlotlyChart {...chartMapa(porEstado)} height={420} />
+        </Panel>
+        <Panel title="Top 10 Unidades" sub="Faturamento acumulado no período" height={420}>
+          <PlotlyChart {...chartBarsH(top10.map(([u]) => semPrefixo(u)), top10.map(([, v]) => v))} height={420} />
         </Panel>
         <Panel title="Composição por Categoria" sub="Locação, renovação, serviços, venda e manutenção" height={360}>
           <PlotlyChart {...chartDonut(porCategoria.map(([k]) => k), porCategoria.map(([, v]) => v))} height={360} />
