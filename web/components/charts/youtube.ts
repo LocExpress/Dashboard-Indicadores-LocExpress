@@ -150,8 +150,8 @@ export function chartYtTopVideos(videos: { title: string; view_count: number }[]
       ...baseLayout(), title: title("Top 10 Vídeos por Visualizações"),
       xaxis: { gridcolor: "#F0F0F0" },
       yaxis: { automargin: true, tickfont: { size: 10 } },
-      height: Math.max(300, top.length * 40 + 80),
-      margin: { l: 10, r: 60, t: 44, b: 10 },
+      height: Math.max(420, top.length * 52 + 100),
+      margin: { l: 10, r: 70, t: 44, b: 40 },
       showlegend: false,
     },
   };

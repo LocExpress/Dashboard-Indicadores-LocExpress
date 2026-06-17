@@ -287,8 +287,10 @@ export default function YoutubeAnalytics() {
             <KpiCard label="Score mais alto" value={fmtNum(videos[0]?.score)}
                      color={COLOR.ORANGE} unit="Views + curtidas + comentários" />
           </div>
-          <ChartBox>
-            <PlotlyChart {...chartYtTopVideos(videos)} />
+          <ChartBox style={{ overflow: "hidden" }}>
+            <div style={{ height: Math.max(420, Math.min(videos.length, 10) * 52 + 100), minHeight: 420 }}>
+              <PlotlyChart {...chartYtTopVideos(videos)} />
+            </div>
           </ChartBox>
           <ChartBox>
             <DataTable columns={VIDEO_COLS} rows={videos as any} maxHeight={500} />
