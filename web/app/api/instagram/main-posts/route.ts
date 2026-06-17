@@ -23,7 +23,7 @@ export async function GET(req: Request) {
     if (franquias?.length) {
       const fid = franquias[0].id;
       const posts = await sbQuery("instagram_posts",
-        `franquia_instagram_id=eq.${fid}&select=timestamp,permalink,media_type&order=timestamp.desc&limit=100`);
+        `franquia_instagram_id=eq.${fid}&select=timestamp,permalink,media_type,media_product_type&order=timestamp.desc&limit=100`);
       if (posts?.length) {
         return NextResponse.json({ posts, source: "supabase" });
       }
@@ -67,7 +67,7 @@ export async function GET(req: Request) {
     }
 
     const media = await metaFetch(`/${igId}/media`, {
-      fields: "id,permalink,timestamp,media_type",
+      fields: "id,permalink,timestamp,media_type,media_product_type",
       limit: "100",
       access_token: pageToken,
     });

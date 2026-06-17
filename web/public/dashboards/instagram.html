@@ -959,7 +959,9 @@ fetch('/api/instagram/main-posts')
       if (!ap.permalink) return;
       const d = new Date(ap.timestamp);
       const dateKey = `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}`;
-      const match = posts.find(p => p.date === dateKey && p.type === ap.media_type && !p.url);
+      // Instagram API retorna VIDEO para Reels; normaliza para bater com o HTML
+      const apiType = (ap.media_product_type === 'REELS' || ap.media_type === 'VIDEO') ? 'REELS' : ap.media_type;
+      const match = posts.find(p => p.date === dateKey && p.type === apiType && !p.url);
       if (match) { match.url = ap.permalink; updated = true; }
     });
     if (updated) {
