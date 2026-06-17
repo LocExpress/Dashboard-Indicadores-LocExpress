@@ -77,7 +77,7 @@ export function chartYtEngagement(analytics: AnalyticsRow[]) {
       xaxis: xAxis(x), yaxis: yAxis,
       margin: MARGIN,
       height: 300,
-      legend: { orientation: "v", x: 1, xanchor: "right", y: 1, yanchor: "top", bgcolor: "rgba(0,0,0,0)" },
+      legend: { x: 0.99, xanchor: "right", y: 0.99, yanchor: "top", bgcolor: "rgba(255,255,255,0.85)", bordercolor: "#E5E7EB", borderwidth: 1 },
     },
   };
 }
@@ -105,7 +105,7 @@ export function chartYtSubscribers(analytics: AnalyticsRow[]) {
       xaxis: xAxis(x), yaxis: yAxis,
       margin: MARGIN,
       height: 300,
-      legend: { orientation: "v", x: 1, xanchor: "right", y: 1, yanchor: "top", bgcolor: "rgba(0,0,0,0)" },
+      legend: { x: 0.99, xanchor: "right", y: 0.99, yanchor: "top", bgcolor: "rgba(255,255,255,0.85)", bordercolor: "#E5E7EB", borderwidth: 1 },
     },
   };
 }
