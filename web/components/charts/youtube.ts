@@ -75,9 +75,9 @@ export function chartYtEngagement(analytics: AnalyticsRow[]) {
       ...baseLayout(), title: title("Engajamento — Curtidas e Comentários"),
       barmode: "group", bargap: 0.2,
       xaxis: xAxis(x), yaxis: yAxis,
-      margin: { l: 40, r: 110, t: 44, b: 60 },
+      margin: { l: 40, r: 20, t: 44, b: 60 },
       height: 300,
-      legend: { x: 1.02, xanchor: "left", y: 1, yanchor: "top", bgcolor: "rgba(0,0,0,0)" },
+      legend: { orientation: "h", x: 1, xanchor: "right", y: 1.14, bgcolor: "rgba(0,0,0,0)" },
     },
   };
 }
@@ -103,9 +103,9 @@ export function chartYtSubscribers(analytics: AnalyticsRow[]) {
       ...baseLayout(), title: title("Inscritos — Ganhos e Perdidos"),
       barmode: "relative", bargap: 0.2,
       xaxis: xAxis(x), yaxis: yAxis,
-      margin: { l: 40, r: 110, t: 44, b: 60 },
+      margin: { l: 40, r: 20, t: 44, b: 60 },
       height: 300,
-      legend: { x: 1.02, xanchor: "left", y: 1, yanchor: "top", bgcolor: "rgba(0,0,0,0)" },
+      legend: { orientation: "h", x: 1, xanchor: "right", y: 1.14, bgcolor: "rgba(0,0,0,0)" },
     },
   };
 }
