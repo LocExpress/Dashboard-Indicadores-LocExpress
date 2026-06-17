@@ -1,5 +1,5 @@
 // Builders de gráficos de Performance / Royalties — estilo executivo (Power BI).
-import { fmtBrl } from "@/lib/format";
+import { fmtBrl, fmtPct } from "@/lib/format";
 import type { PlotlyFigure } from "./PlotlyChartInner";
 
 const BLUE = "#2F3192";
@@ -38,20 +38,21 @@ export function chartLinhaMensal(labels: string[], values: number[], color = ORA
   };
 }
 
-// Ranking horizontal (top unidades)
-export function chartBarsH(labels: string[], values: number[], color = BLUE): PlotlyFigure {
+// Ranking horizontal (top unidades). pct=true formata valores como %.
+export function chartBarsH(labels: string[], values: number[], color = BLUE, pct = false): PlotlyFigure {
+  const fmt = pct ? (v: number) => fmtPct(v) : (v: number) => fmtBrl(v);
   return {
     data: [{
       type: "bar", orientation: "h", x: values, y: labels,
       marker: { color }, width: 0.66,
-      text: values.map((v) => fmtBrl(v)), textposition: "auto", insidetextanchor: "end",
+      text: values.map(fmt), textposition: "auto", insidetextanchor: "end",
       textfont: { size: 11, color: "#fff" }, cliponaxis: false,
       hovertemplate: "%{y}<br>%{text}<extra></extra>",
     }],
     layout: clean({
       showlegend: false,
       margin: { l: 12, r: 16, t: 16, b: 10 },
-      xaxis: { showgrid: true, gridcolor: GRID, zeroline: false, showline: false, ticks: "", tickprefix: "R$ ", tickfont: { size: 11, color: MUTED }, automargin: true },
+      xaxis: { showgrid: true, gridcolor: GRID, zeroline: false, showline: false, ticks: "", ticksuffix: pct ? "%" : undefined, tickprefix: pct ? undefined : "R$ ", tickfont: { size: 11, color: MUTED }, automargin: true },
       yaxis: { showgrid: false, zeroline: false, showline: false, ticks: "", automargin: true, tickfont: { size: 11, color: INK }, categoryorder: "total ascending" },
     }),
   };

@@ -80,6 +80,12 @@ export default function PerformancePage({ data, error }: { data: FatRow[] | null
   const tktRegiao = useMemo(() => ticket(df, (r) => r.Regiao, (r) => r.Faturamento, (r) => r.Qtd).sort((a, b) => b[1] - a[1]), [df]);
   const tktProjeto = useMemo(() => ticket(df, (r) => r.Projeto, (r) => r.Faturamento, (r) => r.Qtd).sort((a, b) => b[1] - a[1]), [df]);
   const tempoCasa = useMemo(() => [...groupSum(df, (r) => r.TempoImplantacao || "—", (r) => r.Faturamento).entries()].sort((a, b) => b[1] - a[1]), [df]);
+  const manutencao = useMemo(() => {
+    const man = new Map<string, number>(); const fat = new Map<string, number>();
+    for (const r of df) { man.set(r.Franquia, (man.get(r.Franquia) ?? 0) + r.Manutencao); fat.set(r.Franquia, (fat.get(r.Franquia) ?? 0) + r.Faturamento); }
+    return [...man.entries()].map(([k, m]) => [semPrefixo(k), (fat.get(k) ?? 0) > 0 ? (m / (fat.get(k) as number)) * 100 : 0] as [string, number])
+      .filter(([, p]) => p > 0).sort((a, b) => b[1] - a[1]).slice(0, 12);
+  }, [df]);
   const porCategoria = useMemo(() => {
     const s = (f: (r: FatRow) => number) => df.reduce((a, r) => a + f(r), 0);
     return ([["Locação", s((r) => r.Locacao)], ["Renovação", s((r) => r.Renovacao)], ["Serviços", s((r) => r.Servicos)], ["Venda", s((r) => r.Venda)], ["Manutenção", s((r) => r.Manutencao)]] as [string, number][]).filter(([, v]) => v > 0);
@@ -143,6 +149,9 @@ export default function PerformancePage({ data, error }: { data: FatRow[] | null
         </Panel>
         <Panel title="Faturamento por Região" sub="Distribuição geográfica" height={320}>
           <PlotlyChart {...chartBarsV(porRegiao.map(([k]) => k), porRegiao.map(([, v]) => v))} height={320} />
+        </Panel>
+        <Panel span title="% Gasto com Manutenção" sub="Manutenção ÷ faturamento por unidade (top 12)" height={340}>
+          <PlotlyChart {...chartBarsH(manutencao.map(([k]) => k), manutencao.map(([, v]) => v), C.orange, true)} height={340} />
         </Panel>
       </div>
 
