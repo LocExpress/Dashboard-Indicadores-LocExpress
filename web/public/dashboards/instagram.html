@@ -803,7 +803,7 @@ function renderPosts() {
         <td><strong>${fmt(p.reach)}</strong></td>
         <td>${p.shares}</td>
         <td style="min-width:80px"><div class="bar-bg"><div class="bar-fill" style="width:${pct}%"></div></div></td>
-        <td>${(()=>{ const u = p.url || permalinkFromThumb(p.thumb); return u ? `<a href="${u}" target="_blank" rel="noopener noreferrer" style="display:inline-flex;align-items:center;gap:3px;background:#F47920;color:#fff;border-radius:6px;padding:3px 10px;font-size:11px;font-weight:700;text-decoration:none;white-space:nowrap">Ver ↗</a>` : '<span style="color:#d1d5db;font-size:11px">—</span>'; })()}</td>
+        <td>${p.url ? `<a href="${p.url}" target="_blank" rel="noopener noreferrer" style="display:inline-flex;align-items:center;gap:3px;background:#F47920;color:#fff;border-radius:6px;padding:3px 10px;font-size:11px;font-weight:700;text-decoration:none;white-space:nowrap">Ver ↗</a>` : '<span style="color:#d1d5db;font-size:11px">—</span>'}</td>
       </tr>`;
   });
 }
