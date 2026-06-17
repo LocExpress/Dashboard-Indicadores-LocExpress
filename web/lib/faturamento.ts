@@ -17,6 +17,8 @@ export interface FatRow {
   Servicos: number;
   Venda: number;
   Manutencao: number;
+  Qtd: number; // total de itens/contratos no mês (todas as categorias)
+  LocacaoQtd: number;
   Projeto: string;
   Cidade: string;
   Estado: string;
@@ -42,10 +44,13 @@ export async function loadFaturamento(): Promise<LoadFatResult> {
   }
   if (raw.length === 0) return { data: null, error: "A base de faturamento está vazia." };
 
+  const qn = (v: string) => { const n = Number(String(v ?? "").replace(/\./g, "").replace(",", ".")); return Number.isFinite(n) ? n : 0; };
   const out: FatRow[] = raw
     .map((r) => {
       const mes = parseMes(r["MÊS"]);
       const ano = Number.isFinite(Number(r["ANO"])) && r["ANO"] !== "" ? Math.trunc(Number(r["ANO"])) : null;
+      const locQtd = qn(r["LOCAÇÃO QTD"]);
+      const qtd = locQtd + qn(r["RENOVAÇÃO QTDD"]) + qn(r["SERVIÇOS QTDD"]) + qn(r["VENDA QTDD"]) + qn(r["MANUTENÇÃO QTDD"]);
       return {
         Ano: ano,
         Mes: mes,
@@ -57,6 +62,8 @@ export async function loadFaturamento(): Promise<LoadFatResult> {
         Servicos: cleanBrl(r["SERVIÇOS VALOR"]) ?? 0,
         Venda: cleanBrl(r["VENDA VALOR"]) ?? 0,
         Manutencao: cleanBrl(r["MANUTENÇÃO VALOR"]) ?? 0,
+        Qtd: qtd,
+        LocacaoQtd: locQtd,
         Projeto: (r["PROJETO"] ?? "").trim() || "—",
         Cidade: (r["CIDADE"] ?? "").trim(),
         Estado: (r["ESTADO"] ?? "").trim(),

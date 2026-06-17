@@ -83,6 +83,30 @@ export function chartDonut(labels: string[], values: number[]): PlotlyFigure {
   };
 }
 
+// Comparação anual: barras (valor) + linha (crescimento % a.a.)
+export function chartAnual(years: string[], values: number[], growth: (number | null)[], barColor = ORANGE): PlotlyFigure {
+  return {
+    data: [
+      {
+        type: "bar", name: "Total", x: years, y: values, marker: { color: barColor }, width: 0.5,
+        text: values.map((v) => fmtBrl(v)), textposition: "outside", textfont: { size: 11, color: SLATE }, cliponaxis: false,
+        hovertemplate: "%{x}<br>%{text}<extra></extra>",
+      },
+      {
+        type: "scatter", mode: "lines+markers+text", name: "Crescimento %", yaxis: "y2", x: years, y: growth as number[],
+        line: { color: BLUE, width: 2.6 }, marker: { size: 7, color: BLUE },
+        text: growth.map((g) => (g == null ? "" : `${g.toFixed(0)}%`)), textposition: "top center", textfont: { size: 11, color: BLUE },
+        hovertemplate: "%{x}<br>Crescimento: %{text}<extra></extra>",
+      },
+    ],
+    layout: clean({
+      bargap: 0.4,
+      yaxis: { showgrid: true, gridcolor: GRID, zeroline: false, showline: false, ticks: "", tickprefix: "R$ ", tickfont: { size: 11, color: MUTED }, automargin: true },
+      yaxis2: { overlaying: "y", side: "right", showgrid: false, zeroline: false, showline: false, ticks: "", ticksuffix: "%", tickfont: { size: 11, color: BLUE } },
+    }),
+  };
+}
+
 // Royalties × Fundo × Taxa por mês (barras agrupadas)
 export function chartRoyMensal(labels: string[], roy: number[], fundo: number[], taxa: number[]): PlotlyFigure {
   return {
