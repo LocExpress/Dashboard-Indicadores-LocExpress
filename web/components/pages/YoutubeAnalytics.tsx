@@ -281,15 +281,15 @@ export default function YoutubeAnalytics() {
       {videos.length > 0 && (
         <>
           <SecHeader>🎬 Vídeos do canal ({videos.length})</SecHeader>
-          <div className="lx-grid" style={{ gridTemplateColumns: "2fr 1fr" }}>
-            <ChartBox><PlotlyChart {...chartYtTopVideos(videos)} /></ChartBox>
-            <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
-              <KpiCard label="Top vídeo" value={(videos[0]?.title ?? "—").slice(0, 30)}
-                       color={COLOR.INDIGO} unit={`${fmtNum(videos[0]?.view_count)} views`} />
-              <KpiCard label="Score mais alto" value={fmtNum(videos[0]?.score)}
-                       color={COLOR.ORANGE} unit="Views + curtidas + comentários" />
-            </div>
+          <div className="lx-grid" style={{ gridTemplateColumns: "repeat(2, 1fr)" }}>
+            <KpiCard label="Top vídeo" value={(videos[0]?.title ?? "—").slice(0, 30)}
+                     color={COLOR.INDIGO} unit={`${fmtNum(videos[0]?.view_count)} views`} />
+            <KpiCard label="Score mais alto" value={fmtNum(videos[0]?.score)}
+                     color={COLOR.ORANGE} unit="Views + curtidas + comentários" />
           </div>
+          <ChartBox>
+            <PlotlyChart {...chartYtTopVideos(videos)} />
+          </ChartBox>
           <ChartBox>
             <DataTable columns={VIDEO_COLS} rows={videos as any} maxHeight={500} />
           </ChartBox>
