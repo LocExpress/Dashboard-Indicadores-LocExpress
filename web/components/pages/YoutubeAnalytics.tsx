@@ -298,9 +298,7 @@ export default function YoutubeAnalytics() {
                      color={COLOR.ORANGE} unit="Views + curtidas + comentários" />
           </div>
           <ChartBox style={{ overflow: "hidden" }}>
-            <div style={{ height: Math.max(560, Math.min(videos.length, 10) * 72 + 120), minHeight: 560 }}>
-              <PlotlyChart {...chartYtTopVideos(videos)} />
-            </div>
+            <PlotlyChart {...chartYtTopVideos(videos)} height={Math.max(560, Math.min(videos.length, 10) * 72 + 120)} />
           </ChartBox>
           <ChartBox>
             <DataTable columns={VIDEO_COLS} rows={videos as any} maxHeight={500} />
