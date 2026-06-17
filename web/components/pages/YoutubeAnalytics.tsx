@@ -63,6 +63,18 @@ const VIDEO_COLS: Column[] = [
     key: "score", label: "Score", align: "right",
     render: (r) => <span style={{ color: COLOR.ORANGE, fontWeight: 700 }}>{fmtNum(r.score)}</span>,
   },
+  {
+    key: "ver", label: "",
+    render: (r) => (
+      <a href={`https://www.youtube.com/watch?v=${r.video_id}`} target="_blank" rel="noopener noreferrer"
+         style={{ display: "inline-flex", alignItems: "center", gap: 3,
+                  background: "#FF0000", color: "#fff", borderRadius: 6,
+                  padding: "3px 10px", fontSize: "0.75rem", textDecoration: "none",
+                  fontWeight: 700, whiteSpace: "nowrap" as const }}>
+        Ver ↗
+      </a>
+    ),
+  },
 ];
 
 const PERIODS = [
