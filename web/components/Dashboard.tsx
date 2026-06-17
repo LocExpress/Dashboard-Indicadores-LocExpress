@@ -8,6 +8,7 @@ import { loadSge, type SgeRow } from "@/lib/sge";
 import { loadOrcamento, type OrcRow } from "@/lib/orcamento";
 import { loadFaturamento, type FatRow } from "@/lib/faturamento";
 import { loadRoyalties, type RoyRow } from "@/lib/royalties";
+import { loadImplantacao, type ImplRow } from "@/lib/implantacao";
 import type { IndicadorRow } from "@/lib/indicators";
 import { MESES_PT } from "@/lib/meses";
 import VisaoGeral from "./pages/VisaoGeral";
@@ -20,15 +21,17 @@ import RhPage from "./pages/RhPage";
 import ViabilidadePage from "./pages/ViabilidadePage";
 import PerformancePage from "./pages/PerformancePage";
 import RoyaltiesPage from "./pages/RoyaltiesPage";
+import ImplantacaoPage from "./pages/ImplantacaoPage";
 import { IndicadoresOverview, ProjetosOverview, FinanceiroOverview } from "./pages/AreaOverviews";
 
 // ─── Telas e áreas ──────────────────────────────────────────────────────────
-type ScreenId = "geral" | "depto" | "sge" | "analytics" | "orc" | "viab" | "royalties" | "fat" | "mkt" | "rh";
+type ScreenId = "geral" | "depto" | "sge" | "analytics" | "orc" | "viab" | "royalties" | "fat" | "impl" | "mkt" | "rh";
 
 const SCREENS: Record<ScreenId, { area: AreaId; label: string; icon: string; filter?: boolean }> = {
   geral: { area: "indicadores", label: "Visão Geral", icon: "chart", filter: true },
   depto: { area: "indicadores", label: "Por Departamento", icon: "building", filter: true },
   fat: { area: "performance", label: "Faturamento das Unidades", icon: "chart" },
+  impl: { area: "implantacao", label: "Implantação", icon: "building" },
   sge: { area: "projetos", label: "Diagnóstico SGE", icon: "search" },
   analytics: { area: "projetos", label: "Portal do Franqueado", icon: "globe" },
   orc: { area: "financeiro", label: "Orçamento", icon: "receipt" },
@@ -38,11 +41,12 @@ const SCREENS: Record<ScreenId, { area: AreaId; label: string; icon: string; fil
   rh: { area: "rh", label: "Recursos Humanos", icon: "users" },
 };
 
-type AreaId = "indicadores" | "performance" | "projetos" | "financeiro" | "marketing" | "rh";
+type AreaId = "indicadores" | "performance" | "implantacao" | "projetos" | "financeiro" | "marketing" | "rh";
 
 const AREAS: { id: AreaId; label: string; icon: string; desc: string; screens: ScreenId[] }[] = [
   { id: "indicadores", label: "Indicadores", icon: "chart", desc: "KPIs por setor, indicador e período", screens: ["geral", "depto"] },
   { id: "performance", label: "Performance", icon: "trendingUp", desc: "Faturamento das unidades franqueadas", screens: ["fat"] },
+  { id: "implantacao", label: "Implantação", icon: "building", desc: "Cadastro e onboarding das unidades", screens: ["impl"] },
   { id: "projetos", label: "Projetos", icon: "layers", desc: "Diagnóstico SGE e Portal do Franqueado", screens: ["sge", "analytics"] },
   { id: "financeiro", label: "Financeiro", icon: "wallet", desc: "Orçamento, Viabilidade e Royalties", screens: ["orc", "viab", "royalties"] },
   { id: "marketing", label: "Marketing", icon: "megaphone", desc: "Painéis e campanhas de marketing", screens: ["mkt"] },
@@ -61,6 +65,8 @@ export default function Dashboard() {
   const [fatErr, setFatErr] = useState<string | null>(null);
   const [roy, setRoy] = useState<RoyRow[] | null>(null);
   const [royErr, setRoyErr] = useState<string | null>(null);
+  const [impl, setImpl] = useState<ImplRow[] | null>(null);
+  const [implErr, setImplErr] = useState<string | null>(null);
 
   const [area, setArea] = useState<AreaId>("indicadores");
   const [screen, setScreen] = useState<ScreenId | null>(null); // null = visão da área
@@ -74,12 +80,13 @@ export default function Dashboard() {
 
   async function loadAll() {
     setLoading(true);
-    const [i, s, o, f, r] = await Promise.all([loadIndicadores(), loadSge(), loadOrcamento(), loadFaturamento(), loadRoyalties()]);
+    const [i, s, o, f, r, im] = await Promise.all([loadIndicadores(), loadSge(), loadOrcamento(), loadFaturamento(), loadRoyalties(), loadImplantacao()]);
     setIndic(i.data); setIndicErr(i.error);
     setSge(s.data); setSgeErr(s.error);
     setOrc(o.data); setOrcErr(o.error);
     setFat(f.data); setFatErr(f.error);
     setRoy(r.data); setRoyErr(r.error);
+    setImpl(im.data); setImplErr(im.error);
     if (i.data) {
       setSelAno(new Set(uniqNums(i.data.map((r) => r.Ano))));
       setSelMes(new Set(uniqNums(i.data.map((r) => r.Mes))));
@@ -143,6 +150,7 @@ export default function Dashboard() {
       case "orc": return <OrcamentoPage data={orc} error={orcErr} />;
       case "royalties": return <RoyaltiesPage data={roy} error={royErr} />;
       case "fat": return <PerformancePage data={fat} error={fatErr} />;
+      case "impl": return <ImplantacaoPage data={impl} error={implErr} />;
       case "mkt": return <Marketing />;
       case "analytics": return <GoogleAnalytics />;
       case "rh": return <RhPage />;

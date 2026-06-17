@@ -155,6 +155,35 @@ export function chartAnual(years: string[], values: number[], growth: (number | 
   };
 }
 
+// Funil (status de implantação)
+export function chartFunil(labels: string[], values: number[]): PlotlyFigure {
+  const palette = [BLUE, ORANGE, "#118DFF", GREEN, "#7A828E", "#FFA040", SLATE, "#C2410C"];
+  return {
+    data: [{
+      type: "funnel", y: labels, x: values, orientation: "h",
+      marker: { color: palette }, textinfo: "value+percent initial",
+      textfont: { size: 12, color: "#fff" }, textposition: "inside",
+      hovertemplate: "%{y}: %{x}<extra></extra>",
+    }],
+    layout: clean({ showlegend: false, margin: { l: 12, r: 14, t: 14, b: 10 }, yaxis: { showgrid: false, zeroline: false, showline: false, ticks: "", automargin: true, tickfont: { size: 11, color: INK } }, xaxis: { visible: false } }),
+  };
+}
+
+// Barras (contagem) + linha (métrica secundária, ex.: tempo de implantação)
+export function chartBarLinha(labels: string[], bars: number[], barName: string, line: number[], lineName: string, lineSuffix = ""): PlotlyFigure {
+  return {
+    data: [
+      { type: "bar", name: barName, x: labels, y: bars, marker: { color: ORANGE }, width: 0.5, text: bars.map(String), textposition: "outside", textfont: { size: 11, color: SLATE }, cliponaxis: false, hovertemplate: `%{x}<br>${barName}: %{y}<extra></extra>` },
+      { type: "scatter", mode: "lines+markers+text", name: lineName, yaxis: "y2", x: labels, y: line, line: { color: INK, width: 2.6 }, marker: { size: 7, color: INK }, text: line.map((v) => `${Math.round(v)}${lineSuffix}`), textposition: "top center", textfont: { size: 11, color: INK }, hovertemplate: `%{x}<br>${lineName}: %{y}<extra></extra>` },
+    ],
+    layout: clean({
+      bargap: 0.45,
+      yaxis: { showgrid: true, gridcolor: GRID, zeroline: false, showline: false, ticks: "", tickfont: { size: 11, color: MUTED }, automargin: true },
+      yaxis2: { overlaying: "y", side: "right", showgrid: false, zeroline: false, showline: false, ticks: "", ticksuffix: lineSuffix, tickfont: { size: 11, color: INK } },
+    }),
+  };
+}
+
 // Royalties × Fundo × Taxa por mês (barras agrupadas)
 export function chartRoyMensal(labels: string[], roy: number[], fundo: number[], taxa: number[]): PlotlyFigure {
   return {
