@@ -162,17 +162,109 @@ export interface LoadSgeResult {
   error: string | null;
 }
 
+// --- Pivot-format parser (new sheet: months as columns) ---
+
+const SETORES_PIVOT = ["IMP.", "PER.", "COM.", "MKT.", "DP/RH", "FIN.", "ADM."];
+const MESES_NORM = MESES_SGE.map((m) =>
+  m.normalize("NFD").replace(/[̀-ͯ]/g, "").toUpperCase()
+);
+
+// Full CSV parser that handles multi-line quoted fields and escaped quotes ("")
+function parseCsvRows(text: string): string[][] {
+  const rows: string[][] = [];
+  let row: string[] = [];
+  let cur = "";
+  let inQ = false;
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    const nx = text[i + 1];
+    if (inQ) {
+      if (ch === '"' && nx === '"') { cur += '"'; i++; }
+      else if (ch === '"') { inQ = false; }
+      else { cur += ch; }
+    } else {
+      if (ch === '"') { inQ = true; }
+      else if (ch === ',') { row.push(cur.trim()); cur = ""; }
+      else if (ch === '\r' && nx === '\n') {
+        row.push(cur.trim()); cur = "";
+        if (row.some(c => c !== "")) rows.push(row);
+        row = []; i++;
+      } else if (ch === '\n' || ch === '\r') {
+        row.push(cur.trim()); cur = "";
+        if (row.some(c => c !== "")) rows.push(row);
+        row = [];
+      } else { cur += ch; }
+    }
+  }
+  if (cur || row.length > 0) {
+    row.push(cur.trim());
+    if (row.some(c => c !== "")) rows.push(row);
+  }
+  return rows;
+}
+
+function parseSgePivot(text: string): SgeRow[] {
+  const rows = parseCsvRows(text);
+  const ano = new Date().getFullYear();
+
+  // Find the row that contains month names (JANEIRO, FEVEREIRO …)
+  let monthRowIdx = -1;
+  const monthCols: { mes: number; startCol: number }[] = [];
+  for (let ri = 0; ri < Math.min(rows.length, 8); ri++) {
+    const normed = rows[ri].map((c) =>
+      c.normalize("NFD").replace(/[̀-ͯ]/g, "").toUpperCase().trim()
+    );
+    if (normed.some((c) => MESES_NORM.includes(c))) {
+      monthRowIdx = ri;
+      for (let ci = 0; ci < normed.length; ci++) {
+        const mi = MESES_NORM.indexOf(normed[ci]);
+        if (mi >= 0) monthCols.push({ mes: mi + 1, startCol: ci });
+      }
+      break;
+    }
+  }
+  if (monthRowIdx === -1 || monthCols.length === 0) return [];
+
+  // Data rows start 2 rows after the month header
+  const out: SgeRow[] = [];
+  for (let ri = monthRowIdx + 2; ri < rows.length; ri++) {
+    const row = rows[ri];
+    const itemNum = (row[1] ?? "").trim();
+    const assunto = (row[2] ?? "").trim();
+    if (!assunto) continue;
+    if (/STATUS/i.test(assunto) || /ASSUNTOS/i.test(assunto)) continue;
+    // Accept rows with numeric item number OR empty item number (e.g. T&D has no number)
+    if (itemNum && !/^\d+$/.test(itemNum)) continue;
+
+    for (const { mes, startCol } of monthCols) {
+      for (let d = 0; d < SETORES_PIVOT.length; d++) {
+        const ci = startCol + d;
+        const raw = ci < row.length ? row[ci] : "";
+        const pontos = parseScore(raw);
+        out.push({
+          ANO: ano,
+          MES: mes,
+          SETOR: SETORES_PIVOT[d],
+          ASSUNTO: assunto,
+          PONTOS: pontos,
+          AVALIADO: pontos !== null,
+          MAXIMO: 5,
+        });
+      }
+    }
+  }
+  return out;
+}
+
 export async function loadSge(): Promise<LoadSgeResult> {
-  let raw: CsvRow[];
   try {
-    raw = await fetchCsvRows(SGE_GERAL_URL);
+    const res = await fetch(SGE_GERAL_URL, { cache: "no-store" });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const text = await res.text();
+    const parsed = parseSgePivot(text);
+    if (parsed.length === 0) return { data: null, error: "Nenhum dado encontrado na planilha." };
+    return { data: parsed, error: null };
   } catch (e) {
     return { data: null, error: String(e) };
   }
-  if (raw.length === 0 || Object.keys(raw[0]).length < 3) {
-    return { data: null, error: "Planilha vazia ou sem colunas suficientes." };
-  }
-  const parsed = parseSge(raw);
-  if (parsed.length === 0) return { data: null, error: "Nenhum dado encontrado na planilha." };
-  return { data: parsed, error: null };
 }

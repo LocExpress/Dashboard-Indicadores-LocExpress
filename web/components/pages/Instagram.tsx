@@ -212,16 +212,19 @@ export default function Instagram() {
       </span>
     )},
     { key: "timestamp", label: "Data", render: (r) => <span style={{ fontSize: "0.82rem" }}>{fmtDate(r.timestamp)}</span> },
+    { key: "permalink", label: "Post", render: (r) => (
+      <a href={r.permalink} target="_blank" rel="noopener noreferrer"
+         style={{ display: "inline-flex", alignItems: "center", gap: 4,
+                  color: "#fff", background: COLOR.INDIGO, borderRadius: 6,
+                  padding: "3px 10px", fontSize: "0.75rem", textDecoration: "none", fontWeight: 700,
+                  whiteSpace: "nowrap" as const }}>
+        Ver post ↗
+      </a>
+    )},
     { key: "reach", label: "Alcance", align: "right", render: (r) => fmt(r.reach) },
     { key: "likes", label: "Curtidas", align: "right", render: (r) => fmt(r.likes) },
     { key: "saved", label: "Salvos", align: "right", render: (r) => fmt(r.saved) },
     { key: "shares", label: "Compart.", align: "right", render: (r) => fmt(r.shares) },
-    { key: "permalink", label: "", render: (r) => (
-      <a href={r.permalink} target="_blank" rel="noopener noreferrer"
-         style={{ color: COLOR.INDIGO, fontSize: "0.75rem", textDecoration: "none", fontWeight: 700 }}>
-        Ver →
-      </a>
-    )},
   ];
 
   const periodBar = (
