@@ -287,8 +287,8 @@ export default function YoutubeAnalytics() {
         </>
       )}
 
-      {/* ── Top vídeos + tabela ── */}
-      {videos.length > 0 && (
+      {/* ── Top vídeos + tabela (só na aba Visualizações) ── */}
+      {videos.length > 0 && activeMetric === "views" && (
         <>
           <SecHeader>🎬 Vídeos do canal ({videos.length})</SecHeader>
           <div className="lx-grid" style={{ gridTemplateColumns: "repeat(2, 1fr)" }}>
