@@ -12,6 +12,27 @@ const GRID = "#EEF0F4";
 const MUTED = "#8A90A2";
 const INK = "#1F2440";
 
+// Linha de tendência por mínimos quadrados (regressão linear sobre o índice).
+function trendLine(y: number[]): number[] {
+  const n = y.length;
+  if (n < 2) return y.slice();
+  let sx = 0, sy = 0, sxx = 0, sxy = 0;
+  for (let i = 0; i < n; i++) { sx += i; sy += y[i]; sxx += i * i; sxy += i * y[i]; }
+  const denom = n * sxx - sx * sx;
+  if (denom === 0) return y.slice();
+  const b = (n * sxy - sx * sy) / denom;
+  const a = (sy - b * sx) / n;
+  return y.map((_, i) => a + b * i);
+}
+
+function trendTrace(labels: string[], values: number[], axis?: string) {
+  return {
+    type: "scatter", mode: "lines", name: "Tendência", x: labels, y: trendLine(values),
+    line: { color: INK, width: 2, dash: "dash" }, ...(axis ? { yaxis: axis } : {}),
+    hovertemplate: "Tendência: %{customdata}<extra></extra>", customdata: trendLine(values).map((v) => fmtBrl(v)),
+  };
+}
+
 function clean(extra: Record<string, any> = {}): Record<string, any> {
   return {
     paper_bgcolor: "rgba(0,0,0,0)", plot_bgcolor: "rgba(0,0,0,0)",
@@ -25,16 +46,19 @@ function clean(extra: Record<string, any> = {}): Record<string, any> {
   };
 }
 
-// Evolução mensal (área + linha)
+// Evolução mensal (área + linha) com linha de tendência
 export function chartLinhaMensal(labels: string[], values: number[], color = ORANGE): PlotlyFigure {
   return {
-    data: [{
-      type: "scatter", mode: "lines+markers", x: labels, y: values,
-      line: { color, width: 2.6, shape: "spline", smoothing: 0.5 }, marker: { size: 6, color },
-      fill: "tozeroy", fillcolor: ORANGE_SOFT,
-      hovertemplate: "%{x}<br>%{customdata}<extra></extra>", customdata: values.map((v) => fmtBrl(v)),
-    }],
-    layout: clean({ showlegend: false, yaxis: { showgrid: true, gridcolor: GRID, zeroline: false, showline: false, ticks: "", tickprefix: "R$ ", tickfont: { size: 11, color: MUTED }, automargin: true } }),
+    data: [
+      {
+        type: "scatter", mode: "lines+markers", name: "Valor", x: labels, y: values,
+        line: { color, width: 2.6, shape: "spline", smoothing: 0.5 }, marker: { size: 6, color },
+        fill: "tozeroy", fillcolor: ORANGE_SOFT,
+        hovertemplate: "%{x}<br>%{customdata}<extra></extra>", customdata: values.map((v) => fmtBrl(v)),
+      },
+      trendTrace(labels, values),
+    ],
+    layout: clean({ showlegend: true, yaxis: { showgrid: true, gridcolor: GRID, zeroline: false, showline: false, ticks: "", tickprefix: "R$ ", tickfont: { size: 11, color: MUTED }, automargin: true } }),
   };
 }
 
@@ -186,11 +210,13 @@ export function chartBarLinha(labels: string[], bars: number[], barName: string,
 
 // Royalties × Fundo × Taxa por mês (barras agrupadas)
 export function chartRoyMensal(labels: string[], roy: number[], fundo: number[], taxa: number[]): PlotlyFigure {
+  const total = roy.map((v, i) => v + fundo[i] + taxa[i]);
   return {
     data: [
       { type: "bar", name: "Royalties", x: labels, y: roy, marker: { color: BLUE }, hovertemplate: "%{x}<br>Royalties: %{customdata}<extra></extra>", customdata: roy.map((v) => fmtBrl(v)) },
       { type: "bar", name: "Fundo de Marketing", x: labels, y: fundo, marker: { color: ORANGE }, hovertemplate: "%{x}<br>Fundo: %{customdata}<extra></extra>", customdata: fundo.map((v) => fmtBrl(v)) },
       { type: "bar", name: "Taxa Administrativa", x: labels, y: taxa, marker: { color: SOFT }, hovertemplate: "%{x}<br>Taxa: %{customdata}<extra></extra>", customdata: taxa.map((v) => fmtBrl(v)) },
+      { ...trendTrace(labels, total), name: "Tendência (total)" },
     ],
     layout: clean({ barmode: "group", bargap: 0.35, yaxis: { showgrid: true, gridcolor: GRID, zeroline: false, showline: false, ticks: "", tickprefix: "R$ ", tickfont: { size: 11, color: MUTED }, automargin: true } }),
   };
