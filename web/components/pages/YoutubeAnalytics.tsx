@@ -223,8 +223,8 @@ export default function YoutubeAnalytics() {
         </div>
       )}
 
-      {/* ── KPI Cards — linha 1 ── */}
-      {channel && (
+      {/* ── KPI Cards — Visualizações ── */}
+      {channel && activeMetric === "views" && (
         <div className="lx-grid" style={{ gridTemplateColumns: "repeat(4, 1fr)" }}>
           <KpiCard label="Inscritos"       value={fmtNum(channel.subscriber_count)} color="#EF4444" unit="Total do canal" />
           <KpiCard label="Views totais"    value={fmtNum(channel.view_count)}       color={COLOR.INDIGO} unit="Histórico" />
@@ -233,8 +233,8 @@ export default function YoutubeAnalytics() {
         </div>
       )}
 
-      {/* ── KPI Cards — linha 2 ── */}
-      {analytics.length > 0 && (
+      {/* ── KPI Cards — Engajamento, Inscritos & Tempo ── */}
+      {analytics.length > 0 && activeMetric === "outros" && (
         <div className="lx-grid" style={{ gridTemplateColumns: "repeat(4, 1fr)" }}>
           <KpiCard label={`Curtidas (${days}d)`}    value={fmtNum(totalLikes)}    color={COLOR.INDIGO} unit={`Últimos ${days} dias`} />
           <KpiCard label={`Comentários (${days}d)`} value={fmtNum(totalComments)} color={COLOR.ORANGE} unit={`Últimos ${days} dias`} />
