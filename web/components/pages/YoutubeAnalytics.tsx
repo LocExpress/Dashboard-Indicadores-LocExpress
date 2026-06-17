@@ -83,13 +83,11 @@ const PERIODS = [
   { label: "90 dias", value: 90 },
 ] as const;
 
-type Metric = "views" | "engagement" | "subscribers" | "watchtime";
+type Metric = "views" | "outros";
 
 const METRIC_TABS: { key: Metric; label: string; icon: string }[] = [
-  { key: "views",       label: "Visualizações",  icon: "👁️"  },
-  { key: "engagement",  label: "Engajamento",    icon: "👍"  },
-  { key: "subscribers", label: "Inscritos",      icon: "👥"  },
-  { key: "watchtime",   label: "Tempo Assistido", icon: "⏱️" },
+  { key: "views",  label: "Visualizações",              icon: "👁️" },
+  { key: "outros", label: "Engajamento, Inscritos & Tempo", icon: "📊" },
 ];
 
 export default function YoutubeAnalytics() {
@@ -268,12 +266,24 @@ export default function YoutubeAnalytics() {
               </button>
             ))}
           </div>
-          <ChartBox>
-            {activeMetric === "views"       && <PlotlyChart {...chartYtViews(analytics)} />}
-            {activeMetric === "engagement"  && <PlotlyChart {...chartYtEngagement(analytics)} />}
-            {activeMetric === "subscribers" && <PlotlyChart {...chartYtSubscribers(analytics)} />}
-            {activeMetric === "watchtime"   && <PlotlyChart {...chartYtWatchtime(analytics)} />}
-          </ChartBox>
+          {activeMetric === "views" && (
+            <ChartBox>
+              <PlotlyChart {...chartYtViews(analytics)} />
+            </ChartBox>
+          )}
+          {activeMetric === "outros" && (
+            <>
+              <ChartBox>
+                <PlotlyChart {...chartYtEngagement(analytics)} />
+              </ChartBox>
+              <ChartBox>
+                <PlotlyChart {...chartYtSubscribers(analytics)} />
+              </ChartBox>
+              <ChartBox>
+                <PlotlyChart {...chartYtWatchtime(analytics)} />
+              </ChartBox>
+            </>
+          )}
         </>
       )}
 
