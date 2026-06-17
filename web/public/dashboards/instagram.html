@@ -949,6 +949,26 @@ buildSelects();
 initCharts();
 renderPosts();
 applyFilter();
+
+// Enriquece posts com permalinks reais via API (assíncrono)
+fetch('/api/instagram/main-posts')
+  .then(r => r.json())
+  .then(data => {
+    if (data.error || !data.posts?.length) return;
+    let updated = false;
+    data.posts.forEach(ap => {
+      if (!ap.permalink) return;
+      const d = new Date(ap.timestamp);
+      const dateKey = `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}`;
+      const match = posts.find(p => p.date === dateKey && p.type === ap.media_type && !p.url);
+      if (match) { match.url = ap.permalink; updated = true; }
+    });
+    if (updated) {
+      document.getElementById('postsBody').innerHTML = '';
+      renderPosts();
+    }
+  })
+  .catch(() => {}); // mantém links derivados como fallback
 loadMetas().then(renderMetas).catch(err => {
   console.error('Metas Marketing:', err);
   const g = document.getElementById('metaKpiGrid');
