@@ -150,7 +150,7 @@ export default function Dashboard() {
       case "orc": return <OrcamentoPage data={orc} error={orcErr} />;
       case "royalties": return <RoyaltiesPage data={roy} error={royErr} />;
       case "fat": return <PerformancePage data={fat} error={fatErr} />;
-      case "impl": return <ImplantacaoPage data={impl} error={implErr} />;
+      case "impl": return <ImplantacaoPage data={impl} fat={fat} error={implErr} />;
       case "mkt": return <Marketing />;
       case "analytics": return <GoogleAnalytics />;
       case "rh": return <RhPage />;

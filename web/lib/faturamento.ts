@@ -23,6 +23,7 @@ export interface FatRow {
   Cidade: string;
   Estado: string;
   Regiao: string;
+  MesOrd: number | null; // mês ordinário de operação (1 = 1º mês)
   TempoImplantacao: string;
   Crescimento: number | null;
   Meta: number | null;
@@ -68,6 +69,7 @@ export async function loadFaturamento(): Promise<LoadFatResult> {
         Cidade: (r["CIDADE"] ?? "").trim(),
         Estado: (r["ESTADO"] ?? "").trim(),
         Regiao: regiaoCurta(r["REGIÃO"]) || "—",
+        MesOrd: (() => { const n = Number(r["Mês ordinário"]); return Number.isFinite(n) && n > 0 ? Math.trunc(n) : null; })(),
         TempoImplantacao: (r["TEMPO DE IMPLANTAÇÃO"] ?? "").trim(),
         Crescimento: cleanNumeric(r["Crescimento Mensal"]),
         Meta: cleanBrl(r["Meta_Playnee"]),

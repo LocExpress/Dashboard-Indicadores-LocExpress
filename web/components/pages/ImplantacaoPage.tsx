@@ -5,8 +5,9 @@ import { Slicer, Panel } from "../Slicer";
 import { DataTable, type Column } from "../ui";
 import PlotlyChart from "../charts/PlotlyChart";
 import { chartDonut, chartFunil, chartBarLinha } from "../charts/performance";
-import { fmtPct } from "@/lib/format";
+import { fmtPct, fmtBrl } from "@/lib/format";
 import type { ImplRow } from "@/lib/implantacao";
+import type { FatRow } from "@/lib/faturamento";
 
 const C = { blue: "#2F3192", orange: "#F5781C", green: "#00B050", red: "#FF3B30", mid: "#6B7280" };
 const semPrefixo = (u: string) => u.replace(/^LOCEXPRESS\s*/i, "");
@@ -18,7 +19,7 @@ function countBy<T>(rows: T[], key: (r: T) => string) {
   return [...m.entries()];
 }
 
-export default function ImplantacaoPage({ data, error }: { data: ImplRow[] | null; error: string | null }) {
+export default function ImplantacaoPage({ data, fat, error }: { data: ImplRow[] | null; fat: FatRow[] | null; error: string | null }) {
   const [projeto, setProjeto] = useState(""); const [sistema, setSistema] = useState(""); const [status, setStatus] = useState("");
   const [regiao, setRegiao] = useState(""); const [estado, setEstado] = useState("");
 
@@ -55,6 +56,15 @@ export default function ImplantacaoPage({ data, error }: { data: ImplRow[] | nul
     return { labels: arr.map(([y]) => String(y)), counts: arr.map(([, v]) => v.n), tempos: arr.map(([, v]) => (v.cnt ? v.soma / v.cnt : 0)) };
   }, [df]);
 
+  // Faturamento médio do 1º trimestre de operação (meses ordinários 1-3),
+  // restrito às unidades visíveis nos filtros atuais. Cruza com a base de faturamento.
+  const mediaFat1Tri = useMemo(() => {
+    if (!fat) return null;
+    const unidades = new Set(df.map((r) => r.Franquia));
+    const vals = fat.filter((r) => r.MesOrd != null && r.MesOrd <= 3 && unidades.has(r.Franquia)).map((r) => r.Faturamento);
+    return vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : null;
+  }, [df, fat]);
+
   const porStatus = useMemo(() => countBy(df, (r) => r.Status).sort((a, b) => b[1] - a[1]), [df]);
   const porSistema = useMemo(() => countBy(df, (r) => r.Sistema).sort((a, b) => b[1] - a[1]), [df]);
   const porProjeto = useMemo(() => countBy(df, (r) => r.Projeto).sort((a, b) => b[1] - a[1]), [df]);
@@ -85,10 +95,10 @@ export default function ImplantacaoPage({ data, error }: { data: ImplRow[] | nul
         <Kpi label="Unidades Ativas" value={String(ins.ativas)} sub={ins.operacoes ? fmtPct((ins.ativas / ins.operacoes) * 100) + " do total" : undefined} accent={C.green} icon="check" />
         <Kpi label="Tempo Médio de Implantação" value={ins.tempoMed == null ? "—" : `${ins.tempoMed.toFixed(0)} dias`} sub="Da assinatura à inauguração" accent={C.orange} icon="clock" />
         <Kpi label="Aderência ao Prazo" value={ins.aderencia == null ? "—" : fmtPct(ins.aderencia)} sub="Dentro do prazo" accent={ins.aderencia != null && ins.aderencia < 60 ? C.red : C.green} icon="target" />
+        <Kpi label="Média Fat. 1º Trimestre" value={mediaFat1Tri == null ? "—" : fmtBrl(mediaFat1Tri)} sub="Faturamento médio nos 3 primeiros meses" accent={C.orange} icon="coins" />
         <Kpi label="Estados" value={String(ins.estados)} sub="Presença geográfica" accent={C.blue} icon="globe" />
         <Kpi label="Cidades" value={String(ins.cidades)} sub="Municípios atendidos" accent={C.blue} icon="building" />
         <Kpi label="Em Implantação" value={String(df.filter((r) => ["A IMPLANTAR", "EM IMPLANTAÇÃO", "AGUARDANDO ASSINATURA", "AGUARDANDO PGTO"].includes(r.Status.toUpperCase())).length)} sub="No pipeline de abertura" accent={C.orange} icon="layers" />
-        <Kpi label="Inativas" value={String(df.filter((r) => r.Status.toUpperCase() === "INATIVA").length)} sub="Unidades encerradas" accent={C.red} icon="trendingDown" />
       </div>
 
       <div className="viab-grid viab-grid-2">
