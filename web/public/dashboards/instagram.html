@@ -761,6 +761,23 @@ function detectTrend(data) {
   return `${arrow} Alcance médio passou de <strong>${fmt(first)}</strong> para <strong>${fmt(second)}</strong> entre a 1ª e 2ª metade do período (<strong>${pct>0?'+':''}${pct}%</strong>).`;
 }
 
+// ─── Deriva permalink do Instagram a partir do media ID no CDN URL ───
+function shortcodeFromId(mediaId) {
+  const ALPHA = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_';
+  let n = BigInt(mediaId);
+  let s = '';
+  while (n > 0n) { s = ALPHA[Number(n % 64n)] + s; n = n / 64n; }
+  return s;
+}
+function permalinkFromThumb(thumb) {
+  if (!thumb) return null;
+  // CDN filename: {prefix}_{mediaId}_{userId}_n.{ext}
+  const m = thumb.match(/\/\d+_(\d+)_\d+_n\.\w+/);
+  if (!m) return null;
+  const sc = shortcodeFromId(m[1]);
+  return sc ? `https://www.instagram.com/p/${sc}/` : null;
+}
+
 // ─── Posts Table ───
 function renderPosts() {
   const typeLabel = {
@@ -786,7 +803,7 @@ function renderPosts() {
         <td><strong>${fmt(p.reach)}</strong></td>
         <td>${p.shares}</td>
         <td style="min-width:80px"><div class="bar-bg"><div class="bar-fill" style="width:${pct}%"></div></div></td>
-        <td>${p.url ? `<a href="${p.url}" target="_blank" rel="noopener noreferrer" style="display:inline-flex;align-items:center;gap:3px;background:#F47920;color:#fff;border-radius:6px;padding:3px 10px;font-size:11px;font-weight:700;text-decoration:none;white-space:nowrap">Ver ↗</a>` : '<span style="color:#d1d5db;font-size:11px">—</span>'}</td>
+        <td>${(()=>{ const u = p.url || permalinkFromThumb(p.thumb); return u ? `<a href="${u}" target="_blank" rel="noopener noreferrer" style="display:inline-flex;align-items:center;gap:3px;background:#F47920;color:#fff;border-radius:6px;padding:3px 10px;font-size:11px;font-weight:700;text-decoration:none;white-space:nowrap">Ver ↗</a>` : '<span style="color:#d1d5db;font-size:11px">—</span>'; })()}</td>
       </tr>`;
   });
 }
