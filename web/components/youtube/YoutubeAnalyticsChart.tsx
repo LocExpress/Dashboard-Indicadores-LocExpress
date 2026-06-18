@@ -24,7 +24,7 @@ interface Props {
 
 const metricConfig = {
   views:       { title: 'Visualizações',          type: 'line' as const, lines: [{ key: 'views',                    name: 'Visualizações', color: '#ef4444' }] },
-  engagement:  { title: 'Engajamento',             type: 'bar'  as const, lines: [{ key: 'likes',                   name: 'Curtidas',      color: '#3b82f6' }, { key: 'comments',             name: 'Comentários', color: '#8b5cf6' }] },
+  engagement:  { title: 'Engajamento',             type: 'bar'  as const, lines: [{ key: 'likes',                   name: 'Curtidas',      color: '#3b82f6' }, { key: 'comments',             name: 'Comentários', color: '#f47920' }] },
   subscribers: { title: 'Inscritos',               type: 'bar'  as const, lines: [{ key: 'subscribers_gained',      name: 'Ganhos',        color: '#10b981' }, { key: 'subscribers_lost',      name: 'Perdidos',    color: '#ef4444' }] },
   watchtime:   { title: 'Tempo Assistido (min)',   type: 'line' as const, lines: [{ key: 'estimated_minutes_watched', name: 'Minutos',     color: '#f59e0b' }] },
 }
