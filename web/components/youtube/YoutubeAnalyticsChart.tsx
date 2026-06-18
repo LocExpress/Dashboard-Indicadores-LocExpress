@@ -2,7 +2,7 @@
 
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip,
-  Legend, ResponsiveContainer, BarChart, Bar,
+  Legend, ResponsiveContainer, BarChart, Bar, Cell,
 } from 'recharts'
 import { format, parseISO } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
@@ -22,11 +22,19 @@ interface Props {
   metric: 'views' | 'engagement' | 'subscribers' | 'watchtime'
 }
 
+const COLORS = {
+  red:    '#ef4444',
+  blue:   '#3b82f6',
+  orange: '#f47920',
+  green:  '#10b981',
+  yellow: '#f59e0b',
+}
+
 const metricConfig = {
-  views:       { title: 'Visualizações',          type: 'line' as const, lines: [{ key: 'views',                    name: 'Visualizações', color: '#ef4444' }] },
-  engagement:  { title: 'Engajamento',             type: 'bar'  as const, lines: [{ key: 'likes',                   name: 'Curtidas',      color: '#3b82f6' }, { key: 'comments',             name: 'Comentários', color: '#f47920' }] },
-  subscribers: { title: 'Inscritos',               type: 'bar'  as const, lines: [{ key: 'subscribers_gained',      name: 'Ganhos',        color: '#10b981' }, { key: 'subscribers_lost',      name: 'Perdidos',    color: '#ef4444' }] },
-  watchtime:   { title: 'Tempo Assistido (min)',   type: 'line' as const, lines: [{ key: 'estimated_minutes_watched', name: 'Minutos',     color: '#f59e0b' }] },
+  views:       { title: 'Visualizações',          type: 'line' as const, lines: [{ key: 'views',                    name: 'Visualizações', color: COLORS.red    }] },
+  engagement:  { title: 'Engajamento',             type: 'bar'  as const, lines: [{ key: 'likes',                   name: 'Curtidas',      color: COLORS.blue   }, { key: 'comments',             name: 'Comentários', color: COLORS.orange }] },
+  subscribers: { title: 'Inscritos',               type: 'bar'  as const, lines: [{ key: 'subscribers_gained',      name: 'Ganhos',        color: COLORS.green  }, { key: 'subscribers_lost',      name: 'Perdidos',    color: COLORS.red    }] },
+  watchtime:   { title: 'Tempo Assistido (min)',   type: 'line' as const, lines: [{ key: 'estimated_minutes_watched', name: 'Minutos',     color: COLORS.yellow }] },
 }
 
 function fmtDate(d: string) {
@@ -70,7 +78,9 @@ export function YoutubeAnalyticsChart({ data, metric }: Props) {
             <Tooltip formatter={(v) => (typeof v === 'number' ? v.toLocaleString('pt-BR') : v)} />
             <Legend />
             {cfg.lines.map((l) => (
-              <Bar key={l.key} dataKey={l.key} name={l.name} fill={l.color} radius={[3, 3, 0, 0]} />
+              <Bar key={l.key} dataKey={l.key} name={l.name} fill={l.color} radius={[3, 3, 0, 0]}>
+                {chartData.map((_, i) => <Cell key={i} fill={l.color} />)}
+              </Bar>
             ))}
           </BarChart>
         )}
