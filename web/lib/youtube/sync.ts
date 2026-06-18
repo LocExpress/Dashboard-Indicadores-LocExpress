@@ -83,19 +83,29 @@ export async function runYoutubeSync(days = 30) {
     }], 'channel_id')
   }
 
-  // 2. Vídeos
+  // 2. Vídeos (pagina para buscar todos, não só os primeiros 50)
   const uploadsRes = await youtube.channels.list({ part: ['contentDetails'], mine: true })
   const uploadsId  = uploadsRes.data.items?.[0]?.contentDetails?.relatedPlaylists?.uploads
   let videosSynced = 0
   if (uploadsId) {
-    const plRes = await youtube.playlistItems.list({
-      part: ['snippet', 'contentDetails'],
-      playlistId: uploadsId,
-      maxResults: 50,
-    })
-    const ids = (plRes.data.items ?? []).map((i) => i.contentDetails?.videoId).filter(Boolean) as string[]
-    if (ids.length > 0) {
-      const vRes = await youtube.videos.list({ part: ['snippet', 'statistics', 'contentDetails'], id: ids })
+    const allIds: string[] = []
+    let pageToken: string | undefined = undefined
+    do {
+      const plRes = await youtube.playlistItems.list({
+        part: ['contentDetails'],
+        playlistId: uploadsId,
+        maxResults: 50,
+        pageToken,
+      })
+      const ids = (plRes.data.items ?? []).map((i) => i.contentDetails?.videoId).filter(Boolean) as string[]
+      allIds.push(...ids)
+      pageToken = plRes.data.nextPageToken ?? undefined
+    } while (pageToken)
+
+    // Busca detalhes em lotes de 50 (limite da API)
+    for (let i = 0; i < allIds.length; i += 50) {
+      const batch = allIds.slice(i, i + 50)
+      const vRes = await youtube.videos.list({ part: ['snippet', 'statistics', 'contentDetails'], id: batch })
       const videos = (vRes.data.items ?? []).map((v) => ({
         video_id:      v.id!,
         channel_id:    channelId,
@@ -114,7 +124,7 @@ export async function runYoutubeSync(days = 30) {
       }))
       if (videos.length > 0) {
         await sbUpsert('youtube_videos', videos, 'video_id')
-        videosSynced = videos.length
+        videosSynced += videos.length
       }
     }
   }
