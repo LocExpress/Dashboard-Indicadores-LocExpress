@@ -136,6 +136,8 @@ export default function YoutubeAnalytics() {
   const [analytics,    setAnalytics]    = useState<AnalyticsRow[]>([]);
   const [videos,       setVideos]       = useState<Video[]>([]);
   const [loading,      setLoading]      = useState(true);
+  const [syncing,      setSyncing]      = useState(false);
+  const [syncMsg,      setSyncMsg]      = useState<string | null>(null);
   const [error,        setError]        = useState<string | null>(null);
   const [activeMetric, setActiveMetric] = useState<Metric>("views");
   const [preset,       setPreset]       = useState<Preset>(30);
@@ -159,6 +161,23 @@ export default function YoutubeAnalytics() {
       setLoading(false);
     }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  async function handleSync() {
+    setSyncing(true);
+    setSyncMsg(null);
+    try {
+      const res = await fetch("/api/youtube/sync", { method: "POST" });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? `HTTP ${res.status}`);
+      const s = data.synced;
+      setSyncMsg(`Sincronizado: ${s.analytics} dias de analytics, ${s.videos} vídeos`);
+      await loadData();
+    } catch (e: any) {
+      setSyncMsg(`Erro: ${e.message}`);
+    } finally {
+      setSyncing(false);
+    }
+  }
 
   useEffect(() => { loadData(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -246,11 +265,14 @@ export default function YoutubeAnalytics() {
               </button>
             ))}
             <DateRangePicker startDate={startDate} endDate={endDate} onChange={applyCustom} />
-            <button onClick={() => loadData()}
-                    className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 transition-colors">
-              <RefreshCw className="h-3.5 w-3.5" />
-              Sincronizar
+            <button onClick={handleSync} disabled={syncing}
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-60 transition-colors">
+              <RefreshCw className={`h-3.5 w-3.5 ${syncing ? "animate-spin" : ""}`} />
+              {syncing ? "Sincronizando..." : "Sincronizar"}
             </button>
+            {syncMsg && (
+              <span className="text-xs text-gray-500">{syncMsg}</span>
+            )}
           </div>
         </div>
       )}
