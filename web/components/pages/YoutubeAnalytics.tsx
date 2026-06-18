@@ -251,7 +251,7 @@ export default function YoutubeAnalytics() {
             <button onClick={() => loadData()}
                     className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 transition-colors">
               <RefreshCw className="h-3.5 w-3.5" />
-              Atualizar
+              Sincronizar
             </button>
           </div>
         </div>
@@ -312,8 +312,51 @@ export default function YoutubeAnalytics() {
 
       {/* ── Lista de vídeos ── */}
       {videos.length > 0 && (
-        <div>
-          <h3 className="mb-3 text-sm font-semibold text-gray-700">Vídeos do canal ({videos.length})</h3>
+        <div className="space-y-4">
+          <h3 className="text-sm font-semibold text-gray-700">Vídeos do canal ({videos.length})</h3>
+
+          {/* Cards de destaque (igual ao VideoList do lochub) */}
+          {topViews && topScore && (
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <a href={`https://www.youtube.com/watch?v=${topViews.video_id}`} target="_blank" rel="noopener noreferrer"
+                 className="group flex gap-3 rounded-xl border border-blue-100 bg-white p-4 shadow-sm hover:border-blue-300 hover:shadow-md transition-all">
+                <div className="w-24 h-14 flex-shrink-0 rounded-lg overflow-hidden bg-gray-100">
+                  {topViews.thumbnail_url && (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={topViews.thumbnail_url} alt={topViews.title} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                  )}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-1.5 mb-1">
+                    <TrendingUp className="h-3.5 w-3.5 text-blue-500" />
+                    <span className="text-xs font-semibold text-blue-600 uppercase tracking-wide">Top Vídeo</span>
+                    <ExternalLink className="h-3 w-3 text-gray-300 group-hover:text-blue-400 ml-auto" />
+                  </div>
+                  <p className="text-sm font-semibold text-gray-800 group-hover:text-blue-600 line-clamp-2 leading-snug">{topViews.title}</p>
+                  <p className="mt-1 text-xs text-gray-400"><Eye className="inline h-3 w-3 mr-0.5" />{fmtN(topViews.view_count)} visualizações</p>
+                </div>
+              </a>
+              <a href={`https://www.youtube.com/watch?v=${topScore.video_id}`} target="_blank" rel="noopener noreferrer"
+                 className="group flex gap-3 rounded-xl border border-yellow-100 bg-white p-4 shadow-sm hover:border-yellow-300 hover:shadow-md transition-all">
+                <div className="w-24 h-14 flex-shrink-0 rounded-lg overflow-hidden bg-gray-100">
+                  {topScore.thumbnail_url && (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={topScore.thumbnail_url} alt={topScore.title} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                  )}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-1.5 mb-1">
+                    <Star className="h-3.5 w-3.5 text-yellow-500" />
+                    <span className="text-xs font-semibold text-yellow-600 uppercase tracking-wide">Score mais alto</span>
+                    <ExternalLink className="h-3 w-3 text-gray-300 group-hover:text-yellow-400 ml-auto" />
+                  </div>
+                  <p className="text-sm font-semibold text-gray-800 group-hover:text-yellow-600 line-clamp-2 leading-snug">{topScore.title}</p>
+                  <p className="mt-1 text-xs text-gray-400"><Star className="inline h-3 w-3 mr-0.5 text-yellow-400" />Score: {fmtN(Number(topScore.score))} · Views + curtidas + comentários</p>
+                </div>
+              </a>
+            </div>
+          )}
+
           <div className="rounded-xl border bg-white shadow-sm overflow-hidden">
             <div className="overflow-x-auto">
               <table className="min-w-full divide-y divide-gray-100">
