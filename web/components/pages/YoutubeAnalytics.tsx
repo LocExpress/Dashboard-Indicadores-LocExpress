@@ -1,13 +1,22 @@
 "use client";
-import { useEffect, useState } from "react";
-import { COLOR } from "@/lib/theme";
-import { KpiCard, ChartBox, DataTable, SecHeader, type Column } from "../ui";
-import PlotlyChart from "../charts/PlotlyChart";
+import { useEffect, useState, useCallback } from "react";
+import { Eye, ThumbsUp, MessageCircle, Users, RefreshCw, PlaySquare, Clock, BarChart2, Star, TrendingUp, ExternalLink } from "lucide-react";
+import { format, parseISO } from "date-fns";
+import { ptBR } from "date-fns/locale";
 import { DateRangePicker } from "../youtube/DateRangePicker";
-import {
-  chartYtViews, chartYtEngagement, chartYtSubscribers,
-  chartYtWatchtime, chartYtTopVideos, type AnalyticsRow,
-} from "../charts/youtube";
+import { YoutubeAnalyticsChart } from "../youtube/YoutubeAnalyticsChart";
+
+type Metric = "views" | "engagement" | "subscribers" | "watchtime";
+type Preset = 7 | 30 | 90 | null;
+
+const PRESETS: { label: string; days: Preset }[] = [
+  { label: "7 dias",  days: 7  },
+  { label: "30 dias", days: 30 },
+  { label: "90 dias", days: 90 },
+];
+
+function toISO(d: Date) { return d.toISOString().slice(0, 10); }
+function daysAgo(n: number) { const d = new Date(); d.setDate(d.getDate() - n); return toISO(d); }
 
 interface Channel {
   title: string;
@@ -17,7 +26,15 @@ interface Channel {
   view_count: number;
   custom_url?: string;
 }
-
+interface AnalyticsRow {
+  date: string;
+  views: number;
+  likes: number;
+  comments: number;
+  subscribers_gained: number;
+  subscribers_lost: number;
+  estimated_minutes_watched: number;
+}
 interface Video {
   video_id: string;
   title: string;
@@ -29,83 +46,105 @@ interface Video {
   score: number;
 }
 
-function fmtNum(n: number | null | undefined): string {
-  if (n == null) return "—";
-  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
-  if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`;
-  return String(n);
+function fmtN(n: number) { return n.toLocaleString("pt-BR"); }
+function fmtDate(d: string) {
+  try { return format(parseISO(d), "dd/MM/yyyy", { locale: ptBR }); } catch { return d?.slice(0, 10) ?? "—"; }
 }
 
-function fmtDate(d: string): string {
-  try {
-    const [y, m, day] = d.slice(0, 10).split("-");
-    return `${day}/${m}/${y}`;
-  } catch {
-    return d?.slice(0, 10) ?? "—";
-  }
+const colorMap: Record<string, string> = {
+  red:    "bg-red-50    text-red-600    border-red-100",
+  blue:   "bg-blue-50   text-blue-600   border-blue-100",
+  green:  "bg-green-50  text-green-600  border-green-100",
+  purple: "bg-purple-50 text-purple-600 border-purple-100",
+  yellow: "bg-yellow-50 text-yellow-600 border-yellow-100",
+};
+const iconBgMap: Record<string, string> = {
+  red:    "bg-red-100    text-red-600",
+  blue:   "bg-blue-100   text-blue-600",
+  green:  "bg-green-100  text-green-600",
+  purple: "bg-purple-100 text-purple-600",
+  yellow: "bg-yellow-100 text-yellow-600",
+};
+
+function MetricsCard({ title, value, subtitle, icon: Icon, color = "blue" }: {
+  title: string; value: string | number; subtitle?: string;
+  icon: React.ElementType; color?: string;
+}) {
+  const formatted = typeof value === "number" ? fmtN(value) : value;
+  return (
+    <div className={`rounded-xl border p-5 bg-white shadow-sm ${colorMap[color]}`}>
+      <div className="flex items-start justify-between">
+        <div>
+          <p className="text-sm font-medium text-gray-500">{title}</p>
+          <p className="mt-1 text-2xl font-bold text-gray-900">{formatted}</p>
+          {subtitle && <p className="mt-1 text-xs text-gray-400">{subtitle}</p>}
+        </div>
+        <div className={`rounded-lg p-2.5 ${iconBgMap[color]}`}>
+          <Icon className="h-5 w-5" />
+        </div>
+      </div>
+    </div>
+  );
 }
 
-const VIDEO_COLS: Column[] = [
-  {
-    key: "title", label: "Vídeo",
-    render: (r) => (
-      <a href={`https://www.youtube.com/watch?v=${r.video_id}`} target="_blank" rel="noopener noreferrer"
-         style={{ color: COLOR.INDIGO, fontWeight: 600, textDecoration: "none" }}>
-        {(r.title ?? "").slice(0, 55)}{(r.title ?? "").length > 55 ? "…" : ""}
+function TopVideoCard({ label, video, metric, color }: {
+  label: string; video: Video; metric: string; color: "blue" | "yellow";
+}) {
+  const ytUrl = `https://www.youtube.com/watch?v=${video.video_id}`;
+  const IconComp = color === "yellow" ? Star : TrendingUp;
+  const borderCls = color === "blue" ? "border-blue-100 hover:border-blue-300" : "border-yellow-100 hover:border-yellow-300";
+  const labelCls  = color === "blue" ? "text-blue-600" : "text-yellow-600";
+  const iconCls   = color === "blue" ? "text-blue-500" : "text-yellow-500";
+  const badgeCls  = color === "blue" ? "bg-blue-100 text-blue-700" : "bg-yellow-100 text-yellow-700";
+  return (
+    <div className={`rounded-xl border bg-white p-4 shadow-sm flex gap-4 items-start transition-all hover:shadow-md ${borderCls}`}>
+      <a href={ytUrl} target="_blank" rel="noopener noreferrer"
+         className="w-28 h-16 flex-shrink-0 rounded-lg overflow-hidden bg-gray-100 block">
+        {video.thumbnail_url && (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={video.thumbnail_url} alt={video.title}
+               style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+        )}
       </a>
-    ),
-  },
-  { key: "published_at", label: "Data", align: "center", render: (r) => fmtDate(r.published_at) },
-  { key: "view_count",   label: "Views",    align: "right", render: (r) => fmtNum(r.view_count) },
-  { key: "like_count",   label: "Curtidas", align: "right", render: (r) => fmtNum(r.like_count) },
-  { key: "comment_count",label: "Coment.",  align: "right", render: (r) => fmtNum(r.comment_count) },
-  {
-    key: "score", label: "Score", align: "right",
-    render: (r) => <span style={{ color: COLOR.ORANGE, fontWeight: 700 }}>{fmtNum(r.score)}</span>,
-  },
-  {
-    key: "ver", label: "",
-    render: (r) => (
-      <a href={`https://www.youtube.com/watch?v=${r.video_id}`} target="_blank" rel="noopener noreferrer"
-         style={{ display: "inline-flex", alignItems: "center", gap: 3,
-                  background: "#FF0000", color: "#fff", borderRadius: 6,
-                  padding: "3px 10px", fontSize: "0.75rem", textDecoration: "none",
-                  fontWeight: 700, whiteSpace: "nowrap" as const }}>
-        Ver ↗
-      </a>
-    ),
-  },
-];
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-1.5 mb-1">
+          <IconComp className={`h-3.5 w-3.5 ${iconCls}`} />
+          <span className={`text-xs font-semibold uppercase tracking-wide ${labelCls}`}>{label}</span>
+          <ExternalLink className="h-3 w-3 text-gray-300 ml-auto" />
+        </div>
+        <a href={ytUrl} target="_blank" rel="noopener noreferrer"
+           className="text-sm font-semibold text-gray-800 hover:text-red-600 line-clamp-2 leading-snug block">
+          {video.title}
+        </a>
+        <div className="mt-2 flex items-center gap-2">
+          <span className={`inline-block rounded-full px-2 py-0.5 text-xs font-bold ${badgeCls}`}>{metric}</span>
+          <a href={ytUrl} target="_blank" rel="noopener noreferrer"
+             className="text-xs font-medium text-gray-400 hover:text-red-500">Ver vídeo →</a>
+        </div>
+      </div>
+    </div>
+  );
+}
 
-const PERIODS = [
-  { label: "7 dias",  value: 7  },
-  { label: "30 dias", value: 30 },
-  { label: "90 dias", value: 90 },
-] as const;
-
-type Metric = "views" | "outros";
-
-const METRIC_TABS: { key: Metric; label: string; icon: string }[] = [
-  { key: "views",  label: "Visualizações",              icon: "👁️" },
-  { key: "outros", label: "Engajamento, Inscritos & Tempo", icon: "📊" },
+const METRIC_TABS: { key: Metric; label: string; icon: React.ElementType }[] = [
+  { key: "views",       label: "Visualizações",   icon: Eye       },
+  { key: "engagement",  label: "Engajamento",      icon: ThumbsUp  },
+  { key: "subscribers", label: "Inscritos",        icon: Users     },
+  { key: "watchtime",   label: "Tempo Assistido",  icon: Clock     },
 ];
 
 export default function YoutubeAnalytics() {
-  const [channel,   setChannel]   = useState<Channel | null>(null);
-  const [analytics, setAnalytics] = useState<AnalyticsRow[]>([]);
-  const [videos,    setVideos]    = useState<Video[]>([]);
+  const [channel,      setChannel]      = useState<Channel | null>(null);
+  const [analytics,    setAnalytics]    = useState<AnalyticsRow[]>([]);
+  const [videos,       setVideos]       = useState<Video[]>([]);
   const [loading,      setLoading]      = useState(true);
   const [error,        setError]        = useState<string | null>(null);
-  const [days,         setDays]         = useState(30);
   const [activeMetric, setActiveMetric] = useState<Metric>("views");
+  const [preset,       setPreset]       = useState<Preset>(30);
+  const [startDate,    setStartDate]    = useState(daysAgo(30));
+  const [endDate,      setEndDate]      = useState(toISO(new Date()));
 
-  function todayISO() { return new Date().toISOString().slice(0, 10); }
-  function daysAgoISO(n: number) { const d = new Date(); d.setDate(d.getDate() - n); return d.toISOString().slice(0, 10); }
-
-  const [startDate, setStartDate] = useState(daysAgoISO(30));
-  const [endDate,   setEndDate]   = useState(todayISO());
-
-  async function load(start = startDate, end = endDate) {
+  const loadData = useCallback(async (start = startDate, end = endDate) => {
     setLoading(true);
     setError(null);
     try {
@@ -121,267 +160,223 @@ export default function YoutubeAnalytics() {
     } finally {
       setLoading(false);
     }
-  }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  function selectPeriod(d: number) {
-    const start = daysAgoISO(d);
-    const end   = todayISO();
-    setDays(d);
+  useEffect(() => { loadData(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  function applyPreset(days: Preset) {
+    if (!days) return;
+    const start = daysAgo(days);
+    const end   = toISO(new Date());
+    setPreset(days);
     setStartDate(start);
     setEndDate(end);
-    load(start, end);
+    loadData(start, end);
   }
 
   function applyCustom(start: string, end: string) {
-    setDays(0);
+    if (!start || !end || start > end) return;
+    setPreset(null);
     setStartDate(start);
     setEndDate(end);
-    load(start, end);
+    loadData(start, end);
   }
 
-  useEffect(() => { load(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // ── Totais 30 dias ────────────────────────────────────────────────────────
   const totalViews    = analytics.reduce((s, r) => s + Number(r.views), 0);
   const totalLikes    = analytics.reduce((s, r) => s + Number(r.likes), 0);
   const totalComments = analytics.reduce((s, r) => s + Number(r.comments), 0);
   const totalMinutes  = analytics.reduce((s, r) => s + Number(r.estimated_minutes_watched), 0);
   const netSubs       = analytics.reduce((s, r) => s + Number(r.subscribers_gained) - Number(r.subscribers_lost), 0);
 
-  if (loading) {
-    return (
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", padding: "4rem", gap: 12 }}>
-        <span className="lx-spinner" style={{ width: 24, height: 24 }} />
-        <span style={{ color: COLOR.GRAY_MID }}>Carregando dados do YouTube…</span>
-      </div>
-    );
-  }
+  if (loading) return (
+    <div className="flex items-center justify-center py-20">
+      <RefreshCw className="h-6 w-6 animate-spin text-red-500" />
+      <span className="ml-2 text-gray-500">Carregando dados...</span>
+    </div>
+  );
 
-  if (error) {
-    return (
-      <div className="info-box" style={{ borderLeftColor: COLOR.RED, background: "#FFF5F5", color: COLOR.RED }}>
-        ❌ {error} — verifique se as variáveis de ambiente do Supabase estão configuradas no Vercel.
-      </div>
-    );
-  }
+  if (error) return (
+    <div className="rounded-xl border border-red-200 bg-red-50 p-6 text-sm text-red-600">
+      ❌ {error}
+    </div>
+  );
 
-  if (!channel && analytics.length === 0 && videos.length === 0) {
-    return (
-      <div className="info-box">
-        ℹ️ Nenhum dado encontrado. Conecte o canal YouTube em <strong>localhost:3000/youtube</strong> e clique em <strong>Sincronizar agora</strong>.
-      </div>
-    );
-  }
+  if (!channel && analytics.length === 0 && videos.length === 0) return (
+    <div className="rounded-xl border bg-white p-8 text-center text-sm text-gray-400 shadow-sm">
+      Nenhum dado encontrado. Sincronize o canal para carregar.
+    </div>
+  );
+
+  const topViews = [...videos].sort((a, b) => b.view_count - a.view_count)[0];
+  const topScore = [...videos].sort((a, b) => b.score       - a.score      )[0];
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+    <div className="space-y-6">
 
-      {/* ── Canal + filtro de período ── */}
+      {/* ── Header do canal ── */}
       {channel && (
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between",
-                      background: "#fff", borderRadius: 14, padding: "0.9rem 1.4rem",
-                      boxShadow: "0 2px 12px rgba(0,0,0,0.07)", flexWrap: "wrap", gap: "0.75rem" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between rounded-xl border bg-white p-5 shadow-sm">
+          <div className="flex items-center gap-4">
             {channel.thumbnail_url && (
+              // eslint-disable-next-line @next/next/no-img-element
               <img src={channel.thumbnail_url} alt={channel.title}
-                   style={{ width: 48, height: 48, borderRadius: "50%", objectFit: "cover",
-                            border: `2px solid ${COLOR.ORANGE}` }} />
+                   className="h-14 w-14 flex-shrink-0 rounded-full object-cover ring-2 ring-red-100" />
             )}
             <div>
-              <div style={{ fontWeight: 900, color: COLOR.INDIGO, fontSize: "1rem" }}>{channel.title}</div>
+              <div className="flex items-center gap-2">
+                <PlaySquare className="h-4 w-4 text-red-600" />
+                <h2 className="text-lg font-bold text-gray-900">{channel.title}</h2>
+              </div>
               {channel.custom_url && (
                 <a href={`https://www.youtube.com/${channel.custom_url}`} target="_blank" rel="noopener noreferrer"
-                   style={{ fontSize: "0.75rem", color: COLOR.GRAY_MID, textDecoration: "none" }}>
+                   className="text-xs text-gray-400 hover:text-red-500">
                   youtube.com/{channel.custom_url}
                 </a>
               )}
             </div>
           </div>
 
-          <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", flexWrap: "wrap" }}>
-            {PERIODS.map((p) => (
-              <button key={p.value} onClick={() => selectPeriod(p.value)}
-                      style={{
-                        padding: "0.35rem 0.9rem", borderRadius: 8, fontWeight: 700,
-                        fontSize: "0.82rem", cursor: "pointer",
-                        border: `1.5px solid ${COLOR.INDIGO}`,
-                        background: days === p.value ? COLOR.INDIGO : "transparent",
-                        color:      days === p.value ? "#fff"        : COLOR.INDIGO,
-                        transition: "all 0.15s",
-                      }}>
+          <div className="flex flex-wrap items-center gap-2">
+            {PRESETS.map((p) => (
+              <button key={p.days} onClick={() => applyPreset(p.days)}
+                      className={`rounded-lg px-3 py-1.5 text-xs font-semibold border transition-colors ${
+                        preset === p.days
+                          ? "bg-red-600 text-white border-red-600"
+                          : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50"
+                      }`}>
                 {p.label}
               </button>
             ))}
             <DateRangePicker startDate={startDate} endDate={endDate} onChange={applyCustom} />
-            <button onClick={() => load()}
-                    style={{ background: "none", border: `1px solid ${COLOR.INDIGO}`, borderRadius: 8,
-                             padding: "0.35rem 0.75rem", fontWeight: 700, color: COLOR.INDIGO,
-                             cursor: "pointer", fontSize: "0.82rem" }}>
-              🔄
+            <button onClick={() => loadData()}
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 transition-colors">
+              <RefreshCw className="h-3.5 w-3.5" />
+              Atualizar
             </button>
           </div>
         </div>
       )}
 
-      {/* ── KPI Cards — Visualizações ── */}
-      {channel && activeMetric === "views" && (
-        <div className="lx-grid" style={{ gridTemplateColumns: "repeat(4, 1fr)" }}>
-          <KpiCard label="Inscritos"       value={fmtNum(channel.subscriber_count)} color="#EF4444" unit="Total do canal" />
-          <KpiCard label="Views totais"    value={fmtNum(channel.view_count)}       color={COLOR.INDIGO} unit="Histórico" />
-          <KpiCard label="Vídeos"          value={fmtNum(channel.video_count)}      color={COLOR.ORANGE} unit="No canal" />
-          <KpiCard label={`Views (${days}d)`} value={fmtNum(totalViews)}            color={COLOR.GREEN}  unit={`Últimos ${days} dias`} />
+      {/* ── KPIs linha 1 (5 colunas) ── */}
+      <div className="grid grid-cols-2 gap-4 lg:grid-cols-5">
+        <MetricsCard title="Inscritos"           value={channel?.subscriber_count ?? 0} icon={Users}          color="red"    subtitle="Total do canal" />
+        <MetricsCard title={`Views (${preset ?? "custom"}d)`}      value={totalViews}                         icon={Eye}            color="blue"   />
+        <MetricsCard title={`Curtidas (${preset ?? "custom"}d)`}   value={totalLikes}                         icon={ThumbsUp}       color="green"  />
+        <MetricsCard title={`Comentários (${preset ?? "custom"}d)`}value={totalComments}                      icon={MessageCircle}  color="purple" />
+        <MetricsCard title="Minutos assistidos"  value={totalMinutes}                   icon={Clock}          color="yellow" subtitle={`Últimos ${preset ?? "..."} dias`} />
+      </div>
+
+      {/* ── KPIs linha 2 (3 colunas) ── */}
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+        <MetricsCard
+          title="Inscritos líquidos"
+          value={netSubs >= 0 ? `+${fmtN(netSubs)}` : fmtN(netSubs)}
+          icon={Users}
+          color={netSubs >= 0 ? "green" : "red"}
+          subtitle="Ganhos − Perdidos"
+        />
+        <MetricsCard title="Total de vídeos"  value={channel?.video_count ?? 0} icon={BarChart2} color="blue"   subtitle="No canal" />
+        <MetricsCard title="Views totais"     value={channel?.view_count  ?? 0} icon={Eye}       color="purple" subtitle="Histórico do canal" />
+      </div>
+
+      {/* ── Top vídeos ── */}
+      {videos.length > 0 && topViews && topScore && (
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <TopVideoCard label="Top Vídeo"    video={topViews} metric={`${fmtN(topViews.view_count)} views`} color="blue"   />
+          <TopVideoCard label="Melhor Score" video={topScore} metric={`${fmtN(topScore.score)} pts`}        color="yellow" />
         </div>
       )}
 
-      {/* ── KPI Cards — Engajamento, Inscritos & Tempo ── */}
-      {analytics.length > 0 && activeMetric === "outros" && (
-        <div className="lx-grid" style={{ gridTemplateColumns: "repeat(4, 1fr)" }}>
-          <KpiCard label={`Curtidas (${days}d)`}    value={fmtNum(totalLikes)}    color={COLOR.INDIGO} unit={`Últimos ${days} dias`} />
-          <KpiCard label={`Comentários (${days}d)`} value={fmtNum(totalComments)} color={COLOR.ORANGE} unit={`Últimos ${days} dias`} />
-          <KpiCard label="Min. assistidos"          value={fmtNum(totalMinutes)}  color={COLOR.YELLOW} unit={`Últimos ${days} dias`} />
-          <KpiCard
-            label="Inscritos líquidos"
-            value={`${netSubs >= 0 ? "+" : ""}${fmtNum(netSubs)}`}
-            color={netSubs >= 0 ? COLOR.GREEN : COLOR.RED}
-            unit={`Ganhos − perdidos (${days}d)`}
-          />
+      {/* ── Gráfico com 4 abas ── */}
+      <div>
+        <div className="mb-3 flex gap-2 overflow-x-auto pb-1">
+          {METRIC_TABS.map((tab) => (
+            <button key={tab.key} onClick={() => setActiveMetric(tab.key)}
+                    className={`inline-flex flex-shrink-0 items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors ${
+                      activeMetric === tab.key
+                        ? "bg-red-600 text-white"
+                        : "bg-white border border-gray-200 text-gray-600 hover:bg-gray-50"
+                    }`}>
+              <tab.icon className="h-3.5 w-3.5" />
+              {tab.label}
+            </button>
+          ))}
         </div>
-      )}
+        {analytics.length > 0
+          ? <YoutubeAnalyticsChart data={analytics} metric={activeMetric} />
+          : <div className="rounded-xl border bg-white p-8 text-center text-sm text-gray-400 shadow-sm">
+              Nenhum dado disponível para o período selecionado.
+            </div>
+        }
+      </div>
 
-      {/* ── Gráfico com abas ── */}
-      {analytics.length > 0 && (
-        <>
-          <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
-            {METRIC_TABS.map((tab) => (
-              <button key={tab.key} onClick={() => setActiveMetric(tab.key)}
-                      style={{
-                        display: "inline-flex", alignItems: "center", gap: "0.35rem",
-                        padding: "0.4rem 1rem", borderRadius: 8, fontWeight: 700,
-                        fontSize: "0.82rem", cursor: "pointer", transition: "all 0.15s",
-                        border: `1.5px solid ${activeMetric === tab.key ? COLOR.RED : "#E5E7EB"}`,
-                        background: activeMetric === tab.key ? COLOR.RED : "#fff",
-                        color:      activeMetric === tab.key ? "#fff"    : "#374151",
-                      }}>
-                <span>{tab.icon}</span>{tab.label}
-              </button>
-            ))}
+      {/* ── Lista de vídeos ── */}
+      {videos.length > 0 && (
+        <div>
+          <h3 className="mb-3 text-sm font-semibold text-gray-700">Vídeos do canal ({videos.length})</h3>
+          <div className="rounded-xl border bg-white shadow-sm overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-100">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-4 py-3 text-left   text-xs font-semibold text-gray-500 uppercase tracking-wider">Vídeo</th>
+                    <th className="px-4 py-3 text-right  text-xs font-semibold text-gray-500 uppercase tracking-wider">Visualizações</th>
+                    <th className="px-4 py-3 text-right  text-xs font-semibold text-gray-500 uppercase tracking-wider">Curtidas</th>
+                    <th className="px-4 py-3 text-right  text-xs font-semibold text-gray-500 uppercase tracking-wider">Comentários</th>
+                    <th className="px-4 py-3 text-right  text-xs font-semibold text-gray-500 uppercase tracking-wider">Score</th>
+                    <th className="px-4 py-3 text-right  text-xs font-semibold text-gray-500 uppercase tracking-wider">Data</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-50">
+                  {videos.map((v) => (
+                    <tr key={v.video_id} className="hover:bg-gray-50 transition-colors">
+                      <td className="px-4 py-3">
+                        <a href={`https://www.youtube.com/watch?v=${v.video_id}`} target="_blank" rel="noopener noreferrer"
+                           className="flex items-center gap-3 group">
+                          <div className="relative w-20 h-12 flex-shrink-0 rounded overflow-hidden bg-gray-100">
+                            {v.thumbnail_url && (
+                              // eslint-disable-next-line @next/next/no-img-element
+                              <img src={v.thumbnail_url} alt={v.title}
+                                   style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                            )}
+                          </div>
+                          <span className="text-sm font-medium text-gray-800 group-hover:text-red-600 line-clamp-2 max-w-xs">
+                            {v.title}
+                          </span>
+                        </a>
+                      </td>
+                      <td className="px-4 py-3 text-right">
+                        <span className="flex items-center justify-end gap-1 text-sm text-gray-700">
+                          <Eye className="h-3.5 w-3.5 text-gray-400" />{fmtN(v.view_count)}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-right">
+                        <span className="flex items-center justify-end gap-1 text-sm text-gray-700">
+                          <ThumbsUp className="h-3.5 w-3.5 text-blue-400" />{fmtN(v.like_count)}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-right">
+                        <span className="flex items-center justify-end gap-1 text-sm text-gray-700">
+                          <MessageCircle className="h-3.5 w-3.5 text-purple-400" />{fmtN(v.comment_count)}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-right">
+                        <span className="flex items-center justify-end gap-1 text-sm font-semibold text-yellow-600">
+                          <Star className="h-3.5 w-3.5" />{fmtN(Number(v.score))}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-right text-xs text-gray-400">
+                        {v.published_at ? fmtDate(v.published_at) : "—"}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
-          {activeMetric === "views" && (
-            <ChartBox>
-              <PlotlyChart {...chartYtViews(analytics)} />
-            </ChartBox>
-          )}
-          {activeMetric === "outros" && (
-            <>
-              <ChartBox>
-                <PlotlyChart {...chartYtEngagement(analytics)} />
-              </ChartBox>
-              <ChartBox>
-                <PlotlyChart {...chartYtSubscribers(analytics)} />
-              </ChartBox>
-              <ChartBox>
-                <PlotlyChart {...chartYtWatchtime(analytics)} />
-              </ChartBox>
-            </>
-          )}
-        </>
+        </div>
       )}
 
-      {/* ── Top vídeos + tabela (só na aba Visualizações) ── */}
-      {videos.length > 0 && activeMetric === "views" && (
-        <>
-          <SecHeader>🎬 Vídeos do canal ({videos.length})</SecHeader>
-          {(() => {
-            const topViews = [...videos].sort((a, b) => b.view_count - a.view_count)[0];
-            const topScore = [...videos].sort((a, b) => b.score - a.score)[0];
-
-            const IconTrending = () => (
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#2563EB" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <polyline points="22 7 13 16 9 12 2 19" />
-                <polyline points="16 7 22 7 22 13" />
-              </svg>
-            );
-            const IconStar = () => (
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="#D97706" stroke="#D97706" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
-              </svg>
-            );
-
-            const card = (
-              borderColor: string,
-              Icon: () => JSX.Element,
-              iconBg: string,
-              labelText: string,
-              labelColor: string,
-              badgeBg: string,
-              badgeColor: string,
-              video: typeof topViews,
-              metric: string,
-            ) => {
-              const url = `https://www.youtube.com/watch?v=${video?.video_id}`;
-              return (
-                <div style={{
-                  background: "#fff", borderRadius: 12, border: `1px solid ${borderColor}`,
-                  boxShadow: "0 1px 3px rgba(0,0,0,0.08)", padding: 16,
-                  display: "flex", gap: 16, alignItems: "flex-start",
-                }}>
-                  <a href={url} target="_blank" rel="noopener noreferrer"
-                     style={{ width: 112, height: 64, flexShrink: 0, borderRadius: 8,
-                              overflow: "hidden", background: "#F3F4F6", display: "block" }}>
-                    {video?.thumbnail_url && (
-                      <img src={video.thumbnail_url} alt={video.title}
-                           style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
-                    )}
-                  </a>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4 }}>
-                      <span style={{ background: iconBg, borderRadius: 6, padding: 4,
-                                     display: "flex", alignItems: "center", justifyContent: "center" }}>
-                        <Icon />
-                      </span>
-                      <span style={{ fontSize: "0.72rem", fontWeight: 600, color: "#6B7280",
-                                     textTransform: "uppercase", letterSpacing: "0.06em" }}>
-                        {labelText}
-                      </span>
-                    </div>
-                    <a href={url} target="_blank" rel="noopener noreferrer"
-                       style={{ fontWeight: 600, color: "#1F2937", fontSize: "0.875rem",
-                                lineHeight: 1.4, textDecoration: "none", display: "block",
-                                overflow: "hidden", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" as const }}>
-                      {video?.title ?? "—"}
-                    </a>
-                    <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 8 }}>
-                      <span style={{ background: badgeBg, color: badgeColor, borderRadius: 999,
-                                     padding: "2px 8px", fontSize: "0.72rem", fontWeight: 700,
-                                     whiteSpace: "nowrap" as const }}>
-                        {metric}
-                      </span>
-                      <a href={url} target="_blank" rel="noopener noreferrer"
-                         style={{ fontSize: "0.72rem", fontWeight: 500, color: "#9CA3AF",
-                                  textDecoration: "none" }}>
-                        Ver vídeo →
-                      </a>
-                    </div>
-                  </div>
-                </div>
-              );
-            };
-
-            return (
-              <div className="lx-grid" style={{ gridTemplateColumns: "repeat(2, 1fr)" }}>
-                {card("#DBEAFE", IconTrending, "#DBEAFE", "Top Vídeo",   "#2563EB", "#DBEAFE", "#1D4ED8", topViews, `${fmtNum(topViews?.view_count)} views`)}
-                {card("#FEF3C7", IconStar,    "#FEF3C7", "Melhor Score", "#D97706", "#FEF3C7", "#B45309", topScore, `${fmtNum(topScore?.score)} pts`)}
-              </div>
-            );
-          })()}
-          <ChartBox style={{ overflow: "hidden" }}>
-            <PlotlyChart {...chartYtTopVideos(videos)} height={Math.max(560, Math.min(videos.length, 10) * 72 + 120)} />
-          </ChartBox>
-          <ChartBox>
-            <DataTable columns={VIDEO_COLS} rows={videos as any} maxHeight={500} />
-          </ChartBox>
-        </>
-      )}
     </div>
   );
 }
