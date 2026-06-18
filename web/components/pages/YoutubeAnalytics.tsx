@@ -6,7 +6,7 @@ import { ptBR } from "date-fns/locale";
 import { DateRangePicker } from "../youtube/DateRangePicker";
 import { YoutubeAnalyticsChart } from "../youtube/YoutubeAnalyticsChart";
 
-type Metric = "views" | "engagement" | "subscribers" | "watchtime";
+type Metric = "views" | "outros";
 type Preset = 7 | 30 | 90 | null;
 
 const PRESETS: { label: string; days: Preset }[] = [
@@ -127,10 +127,8 @@ function TopVideoCard({ label, video, metric, color }: {
 }
 
 const METRIC_TABS: { key: Metric; label: string; icon: React.ElementType }[] = [
-  { key: "views",       label: "Visualizações",   icon: Eye       },
-  { key: "engagement",  label: "Engajamento",      icon: ThumbsUp  },
-  { key: "subscribers", label: "Inscritos",        icon: Users     },
-  { key: "watchtime",   label: "Tempo Assistido",  icon: Clock     },
+  { key: "views",  label: "Visualizações",              icon: Eye    },
+  { key: "outros", label: "Engajamento, Inscritos & Tempo", icon: ThumbsUp },
 ];
 
 export default function YoutubeAnalytics() {
@@ -302,16 +300,25 @@ export default function YoutubeAnalytics() {
             </button>
           ))}
         </div>
-        {analytics.length > 0
-          ? <YoutubeAnalyticsChart data={analytics} metric={activeMetric} />
-          : <div className="rounded-xl border bg-white p-8 text-center text-sm text-gray-400 shadow-sm">
-              Nenhum dado disponível para o período selecionado.
+        {analytics.length > 0 ? (
+          activeMetric === "views" ? (
+            <YoutubeAnalyticsChart data={analytics} metric="views" />
+          ) : (
+            <div className="space-y-4">
+              <YoutubeAnalyticsChart data={analytics} metric="engagement" />
+              <YoutubeAnalyticsChart data={analytics} metric="subscribers" />
+              <YoutubeAnalyticsChart data={analytics} metric="watchtime" />
             </div>
-        }
+          )
+        ) : (
+          <div className="rounded-xl border bg-white p-8 text-center text-sm text-gray-400 shadow-sm">
+            Nenhum dado disponível para o período selecionado.
+          </div>
+        )}
       </div>
 
-      {/* ── Lista de vídeos ── */}
-      {videos.length > 0 && (
+      {/* ── Lista de vídeos (só em Visualizações) ── */}
+      {videos.length > 0 && activeMetric === "views" && (
         <div className="space-y-4">
           <h3 className="text-sm font-semibold text-gray-700">Vídeos do canal ({videos.length})</h3>
 
