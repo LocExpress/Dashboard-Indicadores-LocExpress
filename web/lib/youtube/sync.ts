@@ -57,6 +57,9 @@ async function getAuthenticatedClients() {
 }
 
 export async function runYoutubeSync(days = 30) {
+  if (!process.env.YOUTUBE_CLIENT_ID || !process.env.YOUTUBE_CLIENT_SECRET) {
+    throw new Error('Credenciais YouTube não configuradas nas variáveis de ambiente do Vercel (YOUTUBE_CLIENT_ID / YOUTUBE_CLIENT_SECRET)')
+  }
   const { youtube, youtubeAnalytics, channelId } = await getAuthenticatedClients()
 
   // 1. Canal
