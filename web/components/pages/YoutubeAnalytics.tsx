@@ -291,12 +291,89 @@ export default function YoutubeAnalytics() {
       {videos.length > 0 && activeMetric === "views" && (
         <>
           <SecHeader>🎬 Vídeos do canal ({videos.length})</SecHeader>
-          <div className="lx-grid" style={{ gridTemplateColumns: "repeat(2, 1fr)" }}>
-            <KpiCard label="Top vídeo" value={(videos[0]?.title ?? "—").slice(0, 30)}
-                     color={COLOR.INDIGO} unit={`${fmtNum(videos[0]?.view_count)} views`} />
-            <KpiCard label="Score mais alto" value={fmtNum(videos[0]?.score)}
-                     color={COLOR.ORANGE} unit="Views + curtidas + comentários" />
-          </div>
+          {(() => {
+            const topViews = [...videos].sort((a, b) => b.view_count - a.view_count)[0];
+            const topScore = [...videos].sort((a, b) => b.score - a.score)[0];
+
+            const IconTrending = () => (
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#2563EB" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="22 7 13 16 9 12 2 19" />
+                <polyline points="16 7 22 7 22 13" />
+              </svg>
+            );
+            const IconStar = () => (
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="#D97706" stroke="#D97706" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+              </svg>
+            );
+
+            const card = (
+              borderColor: string,
+              Icon: () => JSX.Element,
+              iconBg: string,
+              labelText: string,
+              labelColor: string,
+              badgeBg: string,
+              badgeColor: string,
+              video: typeof topViews,
+              metric: string,
+            ) => {
+              const url = `https://www.youtube.com/watch?v=${video?.video_id}`;
+              return (
+                <div style={{
+                  background: "#fff", borderRadius: 12, border: `1px solid ${borderColor}`,
+                  boxShadow: "0 1px 3px rgba(0,0,0,0.08)", padding: 16,
+                  display: "flex", gap: 16, alignItems: "flex-start",
+                }}>
+                  <a href={url} target="_blank" rel="noopener noreferrer"
+                     style={{ width: 112, height: 64, flexShrink: 0, borderRadius: 8,
+                              overflow: "hidden", background: "#F3F4F6", display: "block" }}>
+                    {video?.thumbnail_url && (
+                      <img src={video.thumbnail_url} alt={video.title}
+                           style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+                    )}
+                  </a>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4 }}>
+                      <span style={{ background: iconBg, borderRadius: 6, padding: 4,
+                                     display: "flex", alignItems: "center", justifyContent: "center" }}>
+                        <Icon />
+                      </span>
+                      <span style={{ fontSize: "0.72rem", fontWeight: 600, color: "#6B7280",
+                                     textTransform: "uppercase", letterSpacing: "0.06em" }}>
+                        {labelText}
+                      </span>
+                    </div>
+                    <a href={url} target="_blank" rel="noopener noreferrer"
+                       style={{ fontWeight: 600, color: "#1F2937", fontSize: "0.875rem",
+                                lineHeight: 1.4, textDecoration: "none", display: "block",
+                                overflow: "hidden", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" as const }}>
+                      {video?.title ?? "—"}
+                    </a>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 8 }}>
+                      <span style={{ background: badgeBg, color: badgeColor, borderRadius: 999,
+                                     padding: "2px 8px", fontSize: "0.72rem", fontWeight: 700,
+                                     whiteSpace: "nowrap" as const }}>
+                        {metric}
+                      </span>
+                      <a href={url} target="_blank" rel="noopener noreferrer"
+                         style={{ fontSize: "0.72rem", fontWeight: 500, color: "#9CA3AF",
+                                  textDecoration: "none" }}>
+                        Ver vídeo →
+                      </a>
+                    </div>
+                  </div>
+                </div>
+              );
+            };
+
+            return (
+              <div className="lx-grid" style={{ gridTemplateColumns: "repeat(2, 1fr)" }}>
+                {card("#DBEAFE", IconTrending, "#DBEAFE", "Top Vídeo",   "#2563EB", "#DBEAFE", "#1D4ED8", topViews, `${fmtNum(topViews?.view_count)} views`)}
+                {card("#FEF3C7", IconStar,    "#FEF3C7", "Melhor Score", "#D97706", "#FEF3C7", "#B45309", topScore, `${fmtNum(topScore?.score)} pts`)}
+              </div>
+            );
+          })()}
           <ChartBox style={{ overflow: "hidden" }}>
             <PlotlyChart {...chartYtTopVideos(videos)} height={Math.max(560, Math.min(videos.length, 10) * 72 + 120)} />
           </ChartBox>
