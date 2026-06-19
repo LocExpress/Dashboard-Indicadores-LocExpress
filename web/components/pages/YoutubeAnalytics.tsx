@@ -293,7 +293,7 @@ export default function YoutubeAnalytics() {
 
       {/* ── KPIs linha 1 (5 colunas) ── */}
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-5">
-        <MetricsCard title="Inscritos"           value={estimatedSubscribers}           icon={Users}          color="red"    subtitle={netSubs !== 0 ? `Base ${fmtN(channel?.subscriber_count ?? 0)} ${netSubs >= 0 ? `+${fmtN(netSubs)}` : fmtN(netSubs)} no período` : "Total do canal"} />
+        <MetricsCard title="Inscritos"           value={channel?.subscriber_count ?? 0} icon={Users}          color="red"    subtitle="Total do canal" />
         <MetricsCard title={`Views (${preset ?? "custom"}d)`}      value={totalViews}                         icon={Eye}            color="blue"   />
         <MetricsCard title={`Curtidas (${preset ?? "custom"}d)`}   value={totalLikes}                         icon={ThumbsUp}       color="green"  />
         <MetricsCard title={`Comentários (${preset ?? "custom"}d)`}value={totalComments}                      icon={MessageCircle}  color="purple" />
