@@ -90,7 +90,7 @@ export async function runYoutubeSync(days = 30) {
   if (uploadsId) {
     const allIds: string[] = []
     let pageToken: string | undefined = undefined
-    do {
+    while (true) {
       const plRes = await youtube.playlistItems.list({
         part: ['contentDetails'],
         playlistId: uploadsId,
@@ -100,7 +100,8 @@ export async function runYoutubeSync(days = 30) {
       const ids = (plRes.data.items ?? []).map((i) => i.contentDetails?.videoId).filter(Boolean) as string[]
       allIds.push(...ids)
       pageToken = plRes.data.nextPageToken ?? undefined
-    } while (pageToken)
+      if (!pageToken) break
+    }
 
     // Busca detalhes em lotes de 50 (limite da API)
     for (let i = 0; i < allIds.length; i += 50) {
