@@ -89,14 +89,15 @@ export async function runYoutubeSync(days = 30) {
   let videosSynced = 0
   if (uploadsId) {
     const allIds: string[] = []
+    const fetchPage = (token?: string) => youtube.playlistItems.list({
+      part: ['contentDetails'],
+      playlistId: uploadsId,
+      maxResults: 50,
+      pageToken: token,
+    })
     let pageToken: string | undefined = undefined
     while (true) {
-      const plRes = await youtube.playlistItems.list({
-        part: ['contentDetails'],
-        playlistId: uploadsId,
-        maxResults: 50,
-        pageToken,
-      })
+      const plRes = await fetchPage(pageToken)
       const ids = (plRes.data.items ?? []).map((i) => i.contentDetails?.videoId).filter(Boolean) as string[]
       allIds.push(...ids)
       pageToken = plRes.data.nextPageToken ?? undefined
