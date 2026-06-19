@@ -188,6 +188,5 @@ export async function runYoutubeSync(days = 30) {
     channel:    !!ch,
     videos:     videosSynced,
     analytics:  analyticsSynced,
-    period:     { startDate, endDate },
   }
 }
