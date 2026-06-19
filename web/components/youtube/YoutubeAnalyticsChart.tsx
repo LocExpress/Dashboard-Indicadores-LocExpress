@@ -15,11 +15,12 @@ interface AnalyticsRow {
   subscribers_gained: number
   subscribers_lost: number
   estimated_minutes_watched: number
+  subscriber_total?: number
 }
 
 interface Props {
   data: AnalyticsRow[]
-  metric: 'views' | 'engagement' | 'subscribers' | 'watchtime'
+  metric: 'views' | 'engagement' | 'subscribers' | 'watchtime' | 'subscriber_total'
 }
 
 const COLORS = {
@@ -31,10 +32,11 @@ const COLORS = {
 }
 
 const metricConfig = {
-  views:       { title: 'Visualizações',          type: 'line' as const, lines: [{ key: 'views',                    name: 'Visualizações', color: COLORS.red    }] },
-  engagement:  { title: 'Engajamento',             type: 'bar'  as const, lines: [{ key: 'likes',                   name: 'Curtidas',      color: COLORS.blue   }, { key: 'comments',             name: 'Comentários', color: COLORS.orange }] },
-  subscribers: { title: 'Inscritos',               type: 'bar'  as const, lines: [{ key: 'subscribers_gained',      name: 'Ganhos',        color: COLORS.green  }, { key: 'subscribers_lost',      name: 'Perdidos',    color: COLORS.red    }] },
-  watchtime:   { title: 'Tempo Assistido (min)',   type: 'line' as const, lines: [{ key: 'estimated_minutes_watched', name: 'Minutos',     color: COLORS.yellow }] },
+  views:            { title: 'Visualizações',             type: 'line' as const, lines: [{ key: 'views',                     name: 'Visualizações', color: COLORS.red    }] },
+  engagement:       { title: 'Engajamento',                type: 'bar'  as const, lines: [{ key: 'likes',                    name: 'Curtidas',      color: COLORS.blue   }, { key: 'comments',              name: 'Comentários', color: COLORS.orange }] },
+  subscribers:      { title: 'Inscritos Ganhos/Perdidos',  type: 'bar'  as const, lines: [{ key: 'subscribers_gained',       name: 'Ganhos',        color: COLORS.green  }, { key: 'subscribers_lost',       name: 'Perdidos',    color: COLORS.red    }] },
+  watchtime:        { title: 'Tempo Assistido (min)',      type: 'line' as const, lines: [{ key: 'estimated_minutes_watched', name: 'Minutos',      color: COLORS.yellow }] },
+  subscriber_total: { title: 'Total de Inscritos no Canal', type: 'line' as const, lines: [{ key: 'subscriber_total',        name: 'Total Inscritos', color: COLORS.red  }] },
 }
 
 function fmtDate(d: string) {

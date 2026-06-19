@@ -205,6 +205,20 @@ export default function YoutubeAnalytics() {
   const totalMinutes  = analytics.reduce((s, r) => s + Number(r.estimated_minutes_watched), 0);
   const netSubs       = analytics.reduce((s, r) => s + Number(r.subscribers_gained) - Number(r.subscribers_lost), 0);
 
+  // Evolução cumulativa de inscritos: parte do total atual e reconstrói o histórico
+  const subscriberTimeline = (() => {
+    if (!channel || analytics.length === 0) return [];
+    const sorted = [...analytics].sort((a, b) => a.date.localeCompare(b.date));
+    const totalNet = sorted.reduce((s, r) => s + Number(r.subscribers_gained) - Number(r.subscribers_lost), 0);
+    let running = Math.max(0, (channel.subscriber_count ?? 0) - totalNet);
+    return sorted.map((r) => {
+      running += Number(r.subscribers_gained) - Number(r.subscribers_lost);
+      return { ...r, subscriber_total: running };
+    });
+  })();
+
+  const estimatedSubscribers = (channel?.subscriber_count ?? 0) + netSubs;
+
   if (loading) return (
     <div className="flex items-center justify-center py-20">
       <RefreshCw className="h-6 w-6 animate-spin text-red-500" />
@@ -279,7 +293,7 @@ export default function YoutubeAnalytics() {
 
       {/* ── KPIs linha 1 (5 colunas) ── */}
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-5">
-        <MetricsCard title="Inscritos"           value={channel?.subscriber_count ?? 0} icon={Users}          color="red"    subtitle="Total do canal" />
+        <MetricsCard title="Inscritos"           value={estimatedSubscribers}           icon={Users}          color="red"    subtitle={netSubs !== 0 ? `Base ${fmtN(channel?.subscriber_count ?? 0)} ${netSubs >= 0 ? `+${fmtN(netSubs)}` : fmtN(netSubs)} no período` : "Total do canal"} />
         <MetricsCard title={`Views (${preset ?? "custom"}d)`}      value={totalViews}                         icon={Eye}            color="blue"   />
         <MetricsCard title={`Curtidas (${preset ?? "custom"}d)`}   value={totalLikes}                         icon={ThumbsUp}       color="green"  />
         <MetricsCard title={`Comentários (${preset ?? "custom"}d)`}value={totalComments}                      icon={MessageCircle}  color="purple" />
@@ -327,6 +341,9 @@ export default function YoutubeAnalytics() {
             <YoutubeAnalyticsChart data={analytics} metric="views" />
           ) : (
             <div className="space-y-4">
+              {subscriberTimeline.length > 0 && (
+                <YoutubeAnalyticsChart data={subscriberTimeline} metric="subscriber_total" />
+              )}
               <YoutubeAnalyticsChart data={analytics} metric="engagement" />
               <YoutubeAnalyticsChart data={analytics} metric="subscribers" />
               <YoutubeAnalyticsChart data={analytics} metric="watchtime" />
