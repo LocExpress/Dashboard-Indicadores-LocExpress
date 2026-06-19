@@ -57,15 +57,20 @@ async function getAuthenticatedClients() {
 }
 
 export async function runYoutubeSync(days = 30) {
-  if (!process.env.YOUTUBE_CLIENT_ID || !process.env.YOUTUBE_CLIENT_SECRET) {
-    throw new Error('Credenciais YouTube não configuradas nas variáveis de ambiente do Vercel (YOUTUBE_CLIENT_ID / YOUTUBE_CLIENT_SECRET)')
-  }
-  const { youtube, youtubeAnalytics, channelId } = await getAuthenticatedClients()
+  const apiKey = process.env.YOUTUBE_API_KEY
 
-  // 1. Canal
-  const chRes = await youtube.channels.list({
-    part: ['snippet', 'statistics'],
-    mine: true,
+  // Busca channel_id salvo (não precisa de OAuth)
+  const tokenRows = await sbGet('youtube_tokens', 'select=channel_id&order=created_at.desc&limit=1')
+  const channelId: string = tokenRows[0]?.channel_id ?? ''
+  if (!channelId) throw new Error('Canal não configurado. Execute a autenticação OAuth primeiro.')
+
+  // Cliente YouTube com API Key (dados públicos, sem OAuth)
+  const youtubePublic = google.youtube({ version: 'v3', auth: apiKey })
+
+  // 1. Canal via API Key (inscritos, vídeos, views — sempre funciona)
+  const chRes = await youtubePublic.channels.list({
+    part: ['snippet', 'statistics', 'contentDetails'],
+    id: [channelId],
   })
   const ch = chRes.data.items?.[0]
   if (ch) {
@@ -83,13 +88,12 @@ export async function runYoutubeSync(days = 30) {
     }], 'channel_id')
   }
 
-  // 2. Vídeos (pagina para buscar todos, não só os primeiros 50)
-  const uploadsRes = await youtube.channels.list({ part: ['contentDetails'], mine: true })
-  const uploadsId  = uploadsRes.data.items?.[0]?.contentDetails?.relatedPlaylists?.uploads
+  // 2. Vídeos via API Key (pagina para buscar todos)
+  const uploadsId = ch?.contentDetails?.relatedPlaylists?.uploads
   let videosSynced = 0
   if (uploadsId) {
     const allIds: string[] = []
-    const fetchPage = (token?: string) => youtube.playlistItems.list({
+    const fetchPage = (token?: string) => youtubePublic.playlistItems.list({
       part: ['contentDetails'],
       playlistId: uploadsId,
       maxResults: 50,
@@ -107,7 +111,7 @@ export async function runYoutubeSync(days = 30) {
     // Busca detalhes em lotes de 50 (limite da API)
     for (let i = 0; i < allIds.length; i += 50) {
       const batch = allIds.slice(i, i + 50)
-      const vRes = await youtube.videos.list({ part: ['snippet', 'statistics', 'contentDetails'], id: batch })
+      const vRes = await youtubePublic.videos.list({ part: ['snippet', 'statistics', 'contentDetails'], id: batch })
       const videos = (vRes.data.items ?? []).map((v) => ({
         video_id:      v.id!,
         channel_id:    channelId,
@@ -131,46 +135,53 @@ export async function runYoutubeSync(days = 30) {
     }
   }
 
-  // 3. Analytics dos últimos `days` dias
-  const endDate   = format(new Date(), 'yyyy-MM-dd')
-  const startDate = format(subDays(new Date(), days), 'yyyy-MM-dd')
-
-  const analyticsRes = await youtubeAnalytics.reports.query({
-    ids:        `channel==${channelId}`,
-    startDate,
-    endDate,
-    metrics:    'views,estimatedMinutesWatched,averageViewDuration,likes,comments,shares,subscribersGained,subscribersLost',
-    dimensions: 'day',
-    sort:       'day',
-  })
-
-  const headers = analyticsRes.data.columnHeaders?.map((h) => h.name) ?? []
-  const rows    = analyticsRes.data.rows ?? []
-  const colMap: Record<string, string> = {
-    day:                     'date',
-    views:                   'views',
-    estimatedMinutesWatched: 'estimated_minutes_watched',
-    averageViewDuration:     'average_view_duration',
-    likes:                   'likes',
-    comments:                'comments',
-    shares:                  'shares',
-    subscribersGained:       'subscribers_gained',
-    subscribersLost:         'subscribers_lost',
-  }
-
-  const analytics = rows.map((row) => {
-    const entry: Record<string, string | number> = { channel_id: channelId }
-    headers.forEach((header, i) => {
-      const key = colMap[header!]
-      if (key) entry[key] = header === 'day' ? String(row[i]) : Number(row[i])
-    })
-    return entry
-  })
-
+  // 3. Analytics via OAuth (opcional — falha graciosamente se OAuth inválido)
   let analyticsSynced = 0
-  if (analytics.length > 0) {
-    await sbUpsert('youtube_channel_analytics', analytics, 'channel_id,date')
-    analyticsSynced = analytics.length
+  try {
+    if (process.env.YOUTUBE_CLIENT_ID && process.env.YOUTUBE_CLIENT_SECRET) {
+      const { youtubeAnalytics } = await getAuthenticatedClients()
+      const endDate   = format(new Date(), 'yyyy-MM-dd')
+      const startDate = format(subDays(new Date(), days), 'yyyy-MM-dd')
+
+      const analyticsRes = await youtubeAnalytics.reports.query({
+        ids:        `channel==${channelId}`,
+        startDate,
+        endDate,
+        metrics:    'views,estimatedMinutesWatched,averageViewDuration,likes,comments,shares,subscribersGained,subscribersLost',
+        dimensions: 'day',
+        sort:       'day',
+      })
+
+      const headers = analyticsRes.data.columnHeaders?.map((h) => h.name) ?? []
+      const rows    = analyticsRes.data.rows ?? []
+      const colMap: Record<string, string> = {
+        day:                     'date',
+        views:                   'views',
+        estimatedMinutesWatched: 'estimated_minutes_watched',
+        averageViewDuration:     'average_view_duration',
+        likes:                   'likes',
+        comments:                'comments',
+        shares:                  'shares',
+        subscribersGained:       'subscribers_gained',
+        subscribersLost:         'subscribers_lost',
+      }
+
+      const analytics = rows.map((row) => {
+        const entry: Record<string, string | number> = { channel_id: channelId }
+        headers.forEach((header, i) => {
+          const key = colMap[header!]
+          if (key) entry[key] = header === 'day' ? String(row[i]) : Number(row[i])
+        })
+        return entry
+      })
+
+      if (analytics.length > 0) {
+        await sbUpsert('youtube_channel_analytics', analytics, 'channel_id,date')
+        analyticsSynced = analytics.length
+      }
+    }
+  } catch (err) {
+    console.warn('[YouTube Analytics] OAuth falhou, pulando analytics:', err)
   }
 
   return {
