@@ -93,10 +93,6 @@ export default function ViabilidadePage() {
       {/* Filtros / slicers */}
       <div className="viab-filterbar">
         <Slicer label="Projeto" value={slug} options={PROJETOS.map((x) => ({ value: x.slug, label: x.nome }))} onChange={setSlug} />
-        <Slicer label="Ano" disabled soon />
-        <Slicer label="Cenário" disabled soon />
-        <Slicer label="Tipo de Projeto" disabled soon />
-        <Slicer label="Unidade" disabled soon />
       </div>
 
       {/* Navegação segmentada */}
