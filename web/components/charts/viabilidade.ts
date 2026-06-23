@@ -130,6 +130,7 @@ export function chartInvestimentoPie(p: Projeto): PlotlyFigure {
   const data = [
     {
       type: "pie", hole: 0.62,
+      domain: { x: [0, 0.5], y: [0, 1] },
       labels: p.investimento.map((i) => i.label.replace(/^\d+\.\s*/, "")),
       values: p.investimento.map((i) => i.valor),
       marker: { colors: palette, line: { color: "#FFFFFF", width: 2 } },
@@ -142,7 +143,7 @@ export function chartInvestimentoPie(p: Projeto): PlotlyFigure {
   ];
   const layout = clean({
     margin: { l: 8, r: 8, t: 12, b: 8 },
-    legend: { orientation: "v", x: 1.0, xanchor: "right", y: 0.5, font: { size: 11, color: MUTED } },
+    legend: { orientation: "v", x: 0.54, xanchor: "left", y: 0.5, yanchor: "middle", font: { size: 11, color: MUTED } },
     xaxis: { visible: false }, yaxis: { visible: false },
   });
   return { data, layout };
