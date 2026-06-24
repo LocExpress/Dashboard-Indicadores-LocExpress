@@ -32,30 +32,38 @@ export interface MetaPage {
   origem_api: "me_accounts" | "owned_pages" | "client_pages";
 }
 
+function resolveIgAccount(p: any): { id: string } | undefined {
+  return p.instagram_business_account ?? p.connected_instagram_account ?? undefined;
+}
+
 export async function getAllPages(userToken: string): Promise<MetaPage[]> {
   const pages: MetaPage[] = [];
   const seen = new Set<string>();
 
   try {
     const items = await metaFetchAll("/me/accounts", {
-      fields: "id,name,access_token,instagram_business_account",
+      fields: "id,name,access_token,instagram_business_account,connected_instagram_account",
       access_token: userToken,
       limit: "200",
     });
     console.log(`[Meta] /me/accounts: ${items.length} páginas`);
     for (const p of items) {
-      if (!seen.has(p.id)) { seen.add(p.id); pages.push({ ...p, origem_api: "me_accounts" }); }
+      if (!seen.has(p.id)) {
+        seen.add(p.id);
+        pages.push({ ...p, instagram_business_account: resolveIgAccount(p), origem_api: "me_accounts" });
+      }
     }
   } catch (e) { console.error("[Meta] me/accounts:", e); }
 
+  let bizItems: any[] = [];
   try {
-    const bizItems = await metaFetchAll("/me/businesses", { fields: "id,name", access_token: userToken, limit: "50" });
+    bizItems = await metaFetchAll("/me/businesses", { fields: "id,name", access_token: userToken, limit: "50" });
     console.log(`[Meta] /me/businesses: ${bizItems.length} businesses`);
     for (const b of bizItems) {
       for (const ep of ["owned_pages", "client_pages"] as const) {
         try {
           const items = await metaFetchAll(`/${b.id}/${ep}`, {
-            fields: "id,name,access_token,instagram_business_account",
+            fields: "id,name,access_token,instagram_business_account,connected_instagram_account",
             access_token: userToken,
             limit: "200",
           });
@@ -63,13 +71,49 @@ export async function getAllPages(userToken: string): Promise<MetaPage[]> {
           for (const p of items) {
             if (!seen.has(p.id)) {
               seen.add(p.id);
-              pages.push({ ...p, business_id: b.id, origem_api: ep === "owned_pages" ? "owned_pages" : "client_pages" });
+              pages.push({ ...p, instagram_business_account: resolveIgAccount(p), business_id: b.id, origem_api: ep === "owned_pages" ? "owned_pages" : "client_pages" });
             }
           }
         } catch (e) { console.error(`[Meta] ${b.id}/${ep}:`, e); }
       }
     }
   } catch (e) { console.error("[Meta] me/businesses:", e); }
+
+  // Fetch Instagram accounts directly from each business and match to pages
+  for (const b of bizItems) {
+    try {
+      const igAccounts = await metaFetchAll(`/${b.id}/instagram_accounts`, {
+        fields: "id,username,name",
+        access_token: userToken,
+        limit: "200",
+      });
+      console.log(`[Meta] ${b.name}/instagram_accounts: ${igAccounts.length} contas IG`);
+      for (const ig of igAccounts) {
+        try {
+          const igDetails = await metaFetch(`/${ig.id}`, {
+            fields: "id,username,connected_facebook_page{id,name,access_token}",
+            access_token: userToken,
+          });
+          const fbPage = igDetails.connected_facebook_page;
+          if (fbPage?.id) {
+            const existing = pages.find(p => p.id === fbPage.id);
+            if (existing) {
+              if (!existing.instagram_business_account) existing.instagram_business_account = { id: ig.id };
+            } else if (!seen.has(fbPage.id)) {
+              seen.add(fbPage.id);
+              pages.push({ id: fbPage.id, name: fbPage.name ?? ig.username, access_token: fbPage.access_token ?? userToken, instagram_business_account: { id: ig.id }, business_id: b.id, origem_api: "owned_pages" });
+            }
+          } else {
+            const virtualId = `ig_${ig.id}`;
+            if (!seen.has(virtualId)) {
+              seen.add(virtualId);
+              pages.push({ id: virtualId, name: ig.name ?? ig.username, access_token: userToken, instagram_business_account: { id: ig.id }, business_id: b.id, origem_api: "owned_pages" });
+            }
+          }
+        } catch (e) { console.error(`[Meta] ig/${ig.id}:`, e); }
+      }
+    } catch (e) { console.error(`[Meta] ${b.id}/instagram_accounts:`, e); }
+  }
 
   console.log(`[Meta] Total páginas únicas encontradas: ${pages.length}`);
   return pages;
