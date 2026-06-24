@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getAllPages, getIGProfile, getIGInsights, getIGPosts } from "@/lib/instagram/meta";
+import { getAllPages, getIGProfile, getIGInsights, getIGPosts, getPostInsights } from "@/lib/instagram/meta";
 import { sbUpsert } from "@/lib/instagram/db";
 
 export async function POST() {
@@ -54,7 +54,27 @@ export async function POST() {
         const insights = insightsRes.status === "fulfilled" ? insightsRes.value : {};
         const posts = postsRes.status === "fulfilled" ? postsRes.value : [];
 
-        // Upsert daily metrics + all posts in parallel
+        // Upsert daily metrics + posts (collecting post IDs for insights)
+        const postUpsertResults = await Promise.allSettled(
+          posts.map((post: any) => sbUpsert("instagram_posts", {
+            franquia_instagram_id: franquia.id,
+            ig_media_id: post.id,
+            caption: post.caption ?? null,
+            media_type: post.media_type,
+            media_product_type: post.media_product_type ?? null,
+            permalink: post.permalink,
+            timestamp: post.timestamp,
+            like_count: post.like_count ?? 0,
+            comments_count: post.comments_count ?? 0,
+          }, "ig_media_id"))
+        );
+
+        // Fetch insights for up to 10 most recent posts
+        const recentPosts = postUpsertResults
+          .map((r, i) => ({ dbRow: r.status === "fulfilled" ? r.value : null, igMediaId: posts[i]?.id }))
+          .filter(({ dbRow }) => dbRow?.id)
+          .slice(0, 10);
+
         await Promise.allSettled([
           sbUpsert("instagram_daily_metrics", {
             franquia_instagram_id: franquia.id,
@@ -68,18 +88,21 @@ export async function POST() {
             accounts_engaged: insights.accounts_engaged ?? 0,
             total_interactions: insights.total_interactions ?? 0,
           }, "franquia_instagram_id,data"),
-          ...posts.map((post: any) =>
-            sbUpsert("instagram_posts", {
-              franquia_instagram_id: franquia.id,
-              ig_media_id: post.id,
-              caption: post.caption ?? null,
-              media_type: post.media_type,
-              media_product_type: post.media_product_type ?? null,
-              permalink: post.permalink,
-              timestamp: post.timestamp,
-              like_count: post.like_count ?? 0,
-              comments_count: post.comments_count ?? 0,
-            }, "ig_media_id")
+          ...recentPosts.map(({ dbRow, igMediaId }) =>
+            getPostInsights(igMediaId, igToken).then(async (ins) => {
+              if (!ins.reach && !ins.total_interactions) return;
+              await sbUpsert("instagram_post_insights", {
+                post_id: dbRow.id,
+                data_coleta: today,
+                reach: ins.reach ?? 0,
+                likes: ins.likes ?? 0,
+                comments: ins.comments ?? 0,
+                shares: ins.shares ?? 0,
+                saved: ins.saved ?? 0,
+                total_interactions: ins.total_interactions ?? 0,
+                engagement_rate: ins.reach ? ((ins.total_interactions ?? 0) / ins.reach * 100) : 0,
+              }, "post_id,data_coleta");
+            }).catch(() => {})
           ),
         ]);
 
