@@ -40,6 +40,7 @@ export async function getAllPages(userToken: string): Promise<MetaPage[]> {
   const pages: MetaPage[] = [];
   const seen = new Set<string>();
 
+  // 1. Pages the user directly manages
   try {
     const items = await metaFetchAll("/me/accounts", {
       fields: "id,name,access_token,instagram_business_account,connected_instagram_account",
@@ -55,6 +56,7 @@ export async function getAllPages(userToken: string): Promise<MetaPage[]> {
     }
   } catch (e) { console.error("[Meta] me/accounts:", e); }
 
+  // 2. Pages via business manager
   let bizItems: any[] = [];
   try {
     bizItems = await metaFetchAll("/me/businesses", { fields: "id,name", access_token: userToken, limit: "50" });
@@ -67,7 +69,6 @@ export async function getAllPages(userToken: string): Promise<MetaPage[]> {
             access_token: userToken,
             limit: "200",
           });
-          console.log(`[Meta] ${b.name} / ${ep}: ${items.length} páginas`);
           for (const p of items) {
             if (!seen.has(p.id)) {
               seen.add(p.id);
@@ -79,43 +80,38 @@ export async function getAllPages(userToken: string): Promise<MetaPage[]> {
     }
   } catch (e) { console.error("[Meta] me/businesses:", e); }
 
-  // Fetch Instagram accounts directly from each business and match to pages
-  for (const b of bizItems) {
+  // 3. Build map: business_id → ig_id (for pages that don't have Instagram via direct API)
+  const bizIgMap = new Map<string, string>();
+  await Promise.allSettled(bizItems.map(async (b) => {
     try {
       const igAccounts = await metaFetchAll(`/${b.id}/instagram_accounts`, {
-        fields: "id,username,name",
+        fields: "id,username",
         access_token: userToken,
-        limit: "200",
+        limit: "10",
       });
-      console.log(`[Meta] ${b.name}/instagram_accounts: ${igAccounts.length} contas IG`);
-      for (const ig of igAccounts) {
-        try {
-          const igDetails = await metaFetch(`/${ig.id}`, {
-            fields: "id,username,connected_facebook_page{id,name,access_token}",
-            access_token: userToken,
-          });
-          const fbPage = igDetails.connected_facebook_page;
-          if (fbPage?.id) {
-            const existing = pages.find(p => p.id === fbPage.id);
-            if (existing) {
-              if (!existing.instagram_business_account) existing.instagram_business_account = { id: ig.id };
-            } else if (!seen.has(fbPage.id)) {
-              seen.add(fbPage.id);
-              pages.push({ id: fbPage.id, name: fbPage.name ?? ig.username, access_token: fbPage.access_token ?? userToken, instagram_business_account: { id: ig.id }, business_id: b.id, origem_api: "owned_pages" });
-            }
-          } else {
-            const virtualId = `ig_${ig.id}`;
-            if (!seen.has(virtualId)) {
-              seen.add(virtualId);
-              pages.push({ id: virtualId, name: ig.name ?? ig.username, access_token: userToken, instagram_business_account: { id: ig.id }, business_id: b.id, origem_api: "owned_pages" });
-            }
-          }
-        } catch (e) { console.error(`[Meta] ig/${ig.id}:`, e); }
-      }
-    } catch (e) { console.error(`[Meta] ${b.id}/instagram_accounts:`, e); }
-  }
+      if (igAccounts.length > 0) bizIgMap.set(b.id, igAccounts[0].id);
+    } catch {}
+  }));
+  console.log(`[Meta] bizIgMap: ${bizIgMap.size} negócios com Instagram`);
 
-  console.log(`[Meta] Total páginas únicas encontradas: ${pages.length}`);
+  // 4. For pages without Instagram: find their business via page API and look up in map
+  const pagesWithoutIg = pages.filter(p => !p.instagram_business_account);
+  console.log(`[Meta] ${pagesWithoutIg.length} páginas sem Instagram — buscando via negócio`);
+  await Promise.allSettled(pagesWithoutIg.map(async (page) => {
+    try {
+      const details = await metaFetch(`/${page.id}`, {
+        fields: "business",
+        access_token: page.access_token,
+      });
+      const bizId = details.business?.id;
+      if (bizId && bizIgMap.has(bizId)) {
+        page.instagram_business_account = { id: bizIgMap.get(bizId)! };
+      }
+    } catch {}
+  }));
+
+  const withIg = pages.filter(p => p.instagram_business_account).length;
+  console.log(`[Meta] Total páginas: ${pages.length}, com Instagram: ${withIg}`);
   return pages;
 }
 

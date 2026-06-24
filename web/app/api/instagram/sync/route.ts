@@ -30,11 +30,12 @@ export async function POST() {
       }
 
       try {
-        // Fetch profile, insights and posts in parallel per page
+        // Use user token for Instagram API calls (works for business-managed accounts)
+        const igToken = userToken;
         const [profileRes, insightsRes, postsRes] = await Promise.allSettled([
-          getIGProfile(igAccount.id, page.access_token),
-          getIGInsights(igAccount.id, page.access_token),
-          getIGPosts(igAccount.id, page.access_token),
+          getIGProfile(igAccount.id, igToken),
+          getIGInsights(igAccount.id, igToken),
+          getIGPosts(igAccount.id, igToken),
         ]);
 
         if (profileRes.status === "rejected") throw profileRes.reason;
