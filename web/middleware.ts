@@ -4,6 +4,9 @@ const isPublicRoute = createRouteMatcher([
   "/sign-in(.*)",
   "/api/instagram(.*)",
   "/api/ga(.*)",
+  "/api/youtube(.*)",
+  // Visão de embed do Marketing (consumida pelo LocHub via iframe, sem login).
+  "/embed(.*)",
 ]);
 
 export default clerkMiddleware(async (auth, req) => {
