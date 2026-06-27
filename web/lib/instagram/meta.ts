@@ -32,38 +32,47 @@ export interface MetaPage {
   origem_api: "me_accounts" | "owned_pages" | "client_pages";
 }
 
+function resolveIgAccount(p: any): { id: string } | undefined {
+  return p.instagram_business_account ?? p.connected_instagram_account ?? undefined;
+}
+
 export async function getAllPages(userToken: string): Promise<MetaPage[]> {
   const pages: MetaPage[] = [];
   const seen = new Set<string>();
 
+  // 1. Pages the user directly manages
   try {
     const items = await metaFetchAll("/me/accounts", {
-      fields: "id,name,access_token,instagram_business_account",
+      fields: "id,name,access_token,instagram_business_account,connected_instagram_account",
       access_token: userToken,
       limit: "200",
     });
     console.log(`[Meta] /me/accounts: ${items.length} páginas`);
     for (const p of items) {
-      if (!seen.has(p.id)) { seen.add(p.id); pages.push({ ...p, origem_api: "me_accounts" }); }
+      if (!seen.has(p.id)) {
+        seen.add(p.id);
+        pages.push({ ...p, instagram_business_account: resolveIgAccount(p), origem_api: "me_accounts" });
+      }
     }
   } catch (e) { console.error("[Meta] me/accounts:", e); }
 
+  // 2. Pages via business manager
+  let bizItems: any[] = [];
   try {
-    const bizItems = await metaFetchAll("/me/businesses", { fields: "id,name", access_token: userToken, limit: "50" });
+    bizItems = await metaFetchAll("/me/businesses", { fields: "id,name", access_token: userToken, limit: "50" });
     console.log(`[Meta] /me/businesses: ${bizItems.length} businesses`);
     for (const b of bizItems) {
       for (const ep of ["owned_pages", "client_pages"] as const) {
         try {
           const items = await metaFetchAll(`/${b.id}/${ep}`, {
-            fields: "id,name,access_token,instagram_business_account",
+            fields: "id,name,access_token,instagram_business_account,connected_instagram_account",
             access_token: userToken,
             limit: "200",
           });
-          console.log(`[Meta] ${b.name} / ${ep}: ${items.length} páginas`);
           for (const p of items) {
             if (!seen.has(p.id)) {
               seen.add(p.id);
-              pages.push({ ...p, business_id: b.id, origem_api: ep === "owned_pages" ? "owned_pages" : "client_pages" });
+              pages.push({ ...p, instagram_business_account: resolveIgAccount(p), business_id: b.id, origem_api: ep === "owned_pages" ? "owned_pages" : "client_pages" });
             }
           }
         } catch (e) { console.error(`[Meta] ${b.id}/${ep}:`, e); }
@@ -71,7 +80,38 @@ export async function getAllPages(userToken: string): Promise<MetaPage[]> {
     }
   } catch (e) { console.error("[Meta] me/businesses:", e); }
 
-  console.log(`[Meta] Total páginas únicas encontradas: ${pages.length}`);
+  // 3. Build map: business_id → ig_id (for pages that don't have Instagram via direct API)
+  const bizIgMap = new Map<string, string>();
+  await Promise.allSettled(bizItems.map(async (b) => {
+    try {
+      const igAccounts = await metaFetchAll(`/${b.id}/instagram_accounts`, {
+        fields: "id,username",
+        access_token: userToken,
+        limit: "10",
+      });
+      if (igAccounts.length > 0) bizIgMap.set(b.id, igAccounts[0].id);
+    } catch {}
+  }));
+  console.log(`[Meta] bizIgMap: ${bizIgMap.size} negócios com Instagram`);
+
+  // 4. For pages without Instagram: find their business via page API and look up in map
+  const pagesWithoutIg = pages.filter(p => !p.instagram_business_account);
+  console.log(`[Meta] ${pagesWithoutIg.length} páginas sem Instagram — buscando via negócio`);
+  await Promise.allSettled(pagesWithoutIg.map(async (page) => {
+    try {
+      const details = await metaFetch(`/${page.id}`, {
+        fields: "business",
+        access_token: page.access_token,
+      });
+      const bizId = details.business?.id;
+      if (bizId && bizIgMap.has(bizId)) {
+        page.instagram_business_account = { id: bizIgMap.get(bizId)! };
+      }
+    } catch {}
+  }));
+
+  const withIg = pages.filter(p => p.instagram_business_account).length;
+  console.log(`[Meta] Total páginas: ${pages.length}, com Instagram: ${withIg}`);
   return pages;
 }
 
